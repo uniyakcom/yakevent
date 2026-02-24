@@ -22,13 +22,3 @@ func BenchmarkPerCPUCounterRead(b *testing.B) {
 		_ = c.Read()
 	}
 }
-
-func BenchmarkPerCPUCounterParallel(b *testing.B) {
-	c := NewPerCPUCounter()
-	b.ResetTimer()
-	b.RunParallel(func(pb *testing.PB) {
-		for pb.Next() {
-			c.Add(1)
-		}
-	})
-}

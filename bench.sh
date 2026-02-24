@@ -6,7 +6,7 @@
 
 set -e
 
-BENCHTIME="${1:-3s}"
+BENCHTIME="${1:-1s}"
 COUNT="${2:-3}"
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 

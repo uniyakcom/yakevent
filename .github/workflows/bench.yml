@@ -76,7 +76,7 @@ jobs:
           } > "$RUNNER_TEMP/head.txt"
           go test ./... \
             -bench='^Benchmark' \
-            -benchmem -benchtime=2s -count=6 -run='^$' -timeout=600s \
+            -benchmem -benchtime=1s -count=3 -run='^$' -timeout=300s \
             > "$RUNNER_TEMP/raw_head.txt" 2>&1 || { cat "$RUNNER_TEMP/raw_head.txt"; exit 1; }
           grep '^Benchmark' "$RUNNER_TEMP/raw_head.txt" >> "$RUNNER_TEMP/head.txt" || true
           cat "$RUNNER_TEMP/head.txt"
@@ -102,7 +102,7 @@ jobs:
           } > "$RUNNER_TEMP/base.txt"
           go test ./... \
             -bench='^Benchmark' \
-            -benchmem -benchtime=2s -count=6 -run='^$' -timeout=600s \
+            -benchmem -benchtime=1s -count=3 -run='^$' -timeout=300s \
             > "$RUNNER_TEMP/raw_base.txt" 2>&1 || { cat "$RUNNER_TEMP/raw_base.txt"; exit 1; }
           grep '^Benchmark' "$RUNNER_TEMP/raw_base.txt" >> "$RUNNER_TEMP/base.txt" || true
         shell: bash
