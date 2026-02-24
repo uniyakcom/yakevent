@@ -1,0 +1,28 @@
+# ── 构建产物 ──
+*.exe
+*.test
+*.out
+
+# ── 性能分析 ──
+*.prof
+*.trace
+_pprof/
+
+# ── 基准测试临时文件 ──
+bench_current_*.txt
+bench_guard_raw_*.txt
+
+# ── IDE / 编辑器 ──
+.idea/
+!.vscode/
+*.swp
+*.swo
+*~
+
+# ── 操作系统 ──
+.DS_Store
+Thumbs.db
+Desktop.ini
+
+# ── 依赖缓存 ──
+vendor/

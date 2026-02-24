@@ -1,0 +1,651 @@
+// Package flow 提供基于 Pipeline 的高性能批处理流处理器
+package flow
+
+import (
+	"fmt"
+	"runtime"
+	"sync"
+	"sync/atomic"
+	"time"
+
+	"github.com/uniyakcom/yakevent/core"
+	"github.com/uniyakcom/yakevent/util"
+)
+
+// Stage 处理阶段定义，支持批量处理和错误返回
+type Stage func([]*core.Event) error
+
+// subscription 订阅信息（支持CoW模式）
+type subscription struct {
+	id      uint64
+	pattern string
+	handler core.Handler
+}
+
+// flowSnapshot CoW 快照 — 预构建 handler map，消除消费者侧双循环
+type flowSnapshot struct {
+	subs           []*subscription
+	handlers       map[string][]core.Handler // key=pattern, 扁平化 handler
+	singleKey      string                    // 仅 1 种事件类型时的 key（跳过 map hash+lookup）
+	singleHandlers []core.Handler            // 仅 1 种事件类型时的 handler 列表
+	hasWildcard    bool                      // 是否包含通配符模式
+}
+
+// slot Disruptor风格槽位（与queue包一致的设计）
+type flowSlot struct {
+	seq  atomic.Int64
+	data atomic.Pointer[core.Event]
+}
+
+// RB MPSC无锁环形缓冲区（Disruptor风格序列号屏障）
+type RB struct {
+	// 生产者
+	tail atomic.Uint64
+	_    [56]byte // 缓存行填充
+
+	// 消费者
+	head atomic.Uint64
+	_2   [56]byte // 缓存行填充
+
+	buf  []flowSlot
+	cap  uint64
+	mask uint64
+}
+
+// newRB 创建环形缓冲区
+func newRB(capacity int) *RB {
+	sz := 1
+	for sz < capacity {
+		sz *= 2
+	}
+	rb := &RB{
+		buf:  make([]flowSlot, sz),
+		cap:  uint64(sz),
+		mask: uint64(sz - 1),
+	}
+	for i := 0; i < sz; i++ {
+		rb.buf[i].seq.Store(int64(i))
+	}
+	return rb
+}
+
+// push MPSC安全推入（Disruptor风格）
+func (r *RB) push(evt *core.Event) bool {
+	for {
+		tail := r.tail.Load()
+		s := &r.buf[tail&r.mask]
+		seq := s.seq.Load()
+		diff := seq - int64(tail)
+		if diff == 0 {
+			if r.tail.CompareAndSwap(tail, tail+1) {
+				s.data.Store(evt)
+				s.seq.Store(int64(tail + 1))
+				return true
+			}
+		} else if diff < 0 {
+			return false // 满
+		}
+	}
+}
+
+// popBatch 批量弹出（单消费者，Disruptor风格序列号验证）
+func (r *RB) popBatch(batch []*core.Event) int {
+	head := r.head.Load()
+	maxCount := len(batch)
+	count := 0
+
+	for i := 0; i < maxCount; i++ {
+		s := &r.buf[(head+uint64(i))&r.mask]
+		seq := s.seq.Load()
+		if seq != int64(head+uint64(i)+1) {
+			break // 槽位未提交
+		}
+		batch[count] = s.data.Load()
+		s.data.Store(nil)
+		s.seq.Store(int64(head+uint64(i)) + int64(r.cap))
+		count++
+	}
+
+	if count > 0 {
+		r.head.Store(head + uint64(count))
+	}
+	return count
+}
+
+// Bus 高性能批处理事件总线（字段按访问频率排列）
+type Bus struct {
+	// === Reader 热路径 ===
+	matcher   *core.TrieMatcher // 具体类型，消除接口分发
+	buffers   []*RB
+	shardMask uint64
+	numShards int
+
+	// === Reader 快照 ===
+	subsPtr atomic.Pointer[flowSnapshot]
+	closed  atomic.Bool
+
+	// Pipeline阶段
+	stages []Stage
+
+	// 批处理配置（只读）
+	batchSz      int
+	batchTimeout time.Duration
+
+	// ID生成
+	nextID atomic.Uint64
+
+	// 批次缓冲池
+	batchPool sync.Pool
+
+	// 生命周期
+	wg   sync.WaitGroup
+	done chan struct{}
+
+	// 生产者→消费者唤醒信号（per-shard 独立通道，消除跨分片虚假唤醒）
+	notifyChs []chan struct{}
+
+	// 统计信息
+	emitted   atomic.Uint64 // 直接 atomic，消除 PerCPU 间接
+	processed atomic.Uint64
+	batches   atomic.Uint64
+	panics    *util.PerCPUCounter
+
+	// emitSlow 降级专用（预分配复用，避免堆分配）
+	slowBuf []*core.Event
+	slowMu  sync.Mutex
+}
+
+// New 创建批处理处理器
+// 自适应: 分片数量跟随 NumCPU，低核环境（2 vCPU）不再强制 4 分片。
+// 每个分片独立 notify 通道，消除跨分片虚假唤醒。
+func New(stages []Stage, batchSz int, timeout time.Duration) *Bus {
+	if batchSz <= 0 {
+		batchSz = 100
+	}
+	if timeout <= 0 {
+		timeout = 100 * time.Millisecond
+	}
+
+	// 自适应分片: 最小 2（低核保底），最大跟随 NumCPU
+	numShards := runtime.NumCPU()
+	if numShards < 2 {
+		numShards = 2
+	}
+	// 向上取2的幂
+	shards := 1
+	for shards < numShards {
+		shards *= 2
+	}
+
+	// per-shard 独立 notify 通道
+	notifyChs := make([]chan struct{}, shards)
+	for i := 0; i < shards; i++ {
+		notifyChs[i] = make(chan struct{}, 1)
+	}
+
+	p := &Bus{
+		stages:       stages,
+		numShards:    shards,
+		shardMask:    uint64(shards - 1),
+		buffers:      make([]*RB, shards),
+		batchSz:      batchSz,
+		batchTimeout: timeout,
+		done:         make(chan struct{}),
+		notifyChs:    notifyChs,
+		panics:       util.NewPerCPUCounter(),
+		slowBuf:      make([]*core.Event, 1),
+	}
+
+	// 初始化RingBuffer（每个分片独立）
+	bufferSize := batchSz * 4 // 足够的缓冲
+	for i := 0; i < shards; i++ {
+		p.buffers[i] = newRB(bufferSize)
+	}
+
+	// 初始化批次池
+	p.batchPool = sync.Pool{
+		New: func() interface{} {
+			return make([]*core.Event, 0, batchSz)
+		},
+	}
+
+	// 初始化空订阅快照和匹配器
+	p.subsPtr.Store(&flowSnapshot{
+		subs:     make([]*subscription, 0),
+		handlers: make(map[string][]core.Handler),
+	})
+	p.matcher = core.NewTrieMatcher()
+
+	// 为每个分片启动消费者
+	for i := 0; i < shards; i++ {
+		p.wg.Add(1)
+		go p.consumer(i)
+	}
+
+	return p
+}
+
+// getShard 获取分片索引（字节级哈希，避免rune解码开销）
+func (p *Bus) getShard(eventType string) uint64 {
+	h := uint64(0)
+	for i := 0; i < len(eventType); i++ {
+		h = h*31 + uint64(eventType[i])
+	}
+	return h & p.shardMask
+}
+
+// consumer 消费者协程（批量处理 + 信号量阻塞）
+// 使用 select 阻塞（而非忙等待），避免在 VM 环境中耗尽所有 vCPU。
+// 每个分片监听独立 notify 通道，消除跨分片虚假唤醒。
+func (p *Bus) consumer(shardIdx int) {
+	defer p.wg.Done()
+
+	rb := p.buffers[shardIdx]
+	batch := make([]*core.Event, p.batchSz)
+	ticker := time.NewTicker(p.batchTimeout)
+	defer ticker.Stop()
+
+	notifyCh := p.notifyChs[shardIdx]
+
+	for {
+		// 先尝试无阻塞批量弹出
+		count := rb.popBatch(batch)
+		if count > 0 {
+			p.safeProcessBatch(batch[:count])
+			// 有数据时继续紧凑轮询（短窗口内可能还有更多数据）
+			continue
+		}
+
+		// 无数据时阻塞等待（关键修复：不再忙等待）
+		select {
+		case <-p.done:
+			// 关闭时处理剩余事件
+			for {
+				n := rb.popBatch(batch)
+				if n > 0 {
+					p.safeProcessBatch(batch[:n])
+				} else {
+					break
+				}
+			}
+			return
+
+		case <-ticker.C:
+			// 定时唤醒：处理可能积压的事件
+			n := rb.popBatch(batch)
+			if n > 0 {
+				p.safeProcessBatch(batch[:n])
+			}
+
+		case <-notifyCh:
+			// 生产者信号唤醒：立即消费（仅本分片有数据时触发）
+			n := rb.popBatch(batch)
+			if n > 0 {
+				p.safeProcessBatch(batch[:n])
+			}
+		}
+	}
+}
+
+// safeProcessBatch 安全处理批次：捕获 panic，防止 consumer 崩溃
+func (p *Bus) safeProcessBatch(events []*core.Event) {
+	defer func() {
+		if r := recover(); r != nil {
+			p.panics.Add(1)
+		}
+	}()
+	p.processBatch(events)
+}
+
+// processBatch 处理一个批次的事件
+// 精确匹配: 直接索引 handlers[evt.Type]，零分配
+// 通配符: fallback 到 TrieMatcher.Match，仅在有通配符订阅时触发
+func (p *Bus) processBatch(events []*core.Event) {
+	if len(events) == 0 {
+		return
+	}
+
+	// 执行Pipeline阶段
+	current := events
+	for _, stage := range p.stages {
+		if len(current) == 0 {
+			break
+		}
+		if err := stage(current); err != nil {
+			break
+		}
+	}
+
+	// 调用订阅handler
+	snap := p.subsPtr.Load()
+	if len(snap.handlers) > 0 && len(current) > 0 {
+		if snap.singleKey != "" {
+			// 最快路径: 仅 1 种事件类型，跳过 map hash+lookup
+			for _, evt := range current {
+				for _, h := range snap.singleHandlers {
+					h(evt)
+				}
+			}
+		} else if !snap.hasWildcard {
+			// 快速路径: 仅精确匹配，直接 map 索引，零分配
+			for _, evt := range current {
+				for _, h := range snap.handlers[evt.Type] {
+					h(evt)
+				}
+			}
+		} else {
+			// 通配符路径: 需要 TrieMatcher 解析
+			for _, evt := range current {
+				patterns := p.matcher.Match(evt.Type)
+				for _, pat := range *patterns {
+					for _, h := range snap.handlers[pat] {
+						h(evt)
+					}
+				}
+				p.matcher.Put(patterns)
+			}
+		}
+	}
+
+	// 更新统计
+	p.processed.Add(uint64(len(events)))
+	p.batches.Add(1)
+}
+
+// processSingle 处理单个事件（emitSlow 降级专用，零分配）
+// 使用预分配的 slowBuf 复用切片，避免每次创建切片字面量导致的堆逃逸。
+// mutex 保护是可接受的: 该路径仅在所有 ring buffer 分片全满时触发。
+//
+//go:noinline
+func (p *Bus) processSingle(evt *core.Event) {
+	p.slowMu.Lock()
+
+	// 复用预分配切片
+	p.slowBuf[0] = evt
+
+	// 执行 Pipeline 阶段
+	for _, stage := range p.stages {
+		if err := stage(p.slowBuf); err != nil {
+			break
+		}
+	}
+
+	// 调用订阅 handler
+	snap := p.subsPtr.Load()
+	if len(snap.handlers) > 0 {
+		if snap.singleKey != "" {
+			// 最快路径: 仅 1 种事件类型，跳过 map hash+lookup
+			for _, h := range snap.singleHandlers {
+				h(evt)
+			}
+		} else if !snap.hasWildcard {
+			for _, h := range snap.handlers[evt.Type] {
+				h(evt)
+			}
+		} else {
+			patterns := p.matcher.Match(evt.Type)
+			for _, pat := range *patterns {
+				for _, h := range snap.handlers[pat] {
+					h(evt)
+				}
+			}
+			p.matcher.Put(patterns)
+		}
+	}
+
+	p.slowBuf[0] = nil // 防止 GC 保留引用
+	p.slowMu.Unlock()
+
+	p.processed.Add(1)
+	p.batches.Add(1)
+}
+
+// buildFlowSnapshot 从订阅列表构建快照（On/Off 时调用，非热路径）
+func buildFlowSnapshot(subs []*subscription) *flowSnapshot {
+	handlers := make(map[string][]core.Handler)
+	hasWild := false
+	for _, s := range subs {
+		handlers[s.pattern] = append(handlers[s.pattern], s.handler)
+		if !hasWild && containsWildcard(s.pattern) {
+			hasWild = true
+		}
+	}
+	snap := &flowSnapshot{subs: subs, handlers: handlers, hasWildcard: hasWild}
+	// 单类型快速路径：仅 1 种精确匹配事件类型时缓存 key+handlers，跳过 map hash+lookup（≈10-16ns/event）
+	// 注意: 通配符模式不能走此路径，必须经过 TrieMatcher
+	if !hasWild && len(handlers) == 1 {
+		for k, hs := range handlers {
+			snap.singleKey = k
+			snap.singleHandlers = hs
+		}
+	}
+	return snap
+}
+
+// containsWildcard 检查 pattern 是否包含通配符
+func containsWildcard(pattern string) bool {
+	for i := 0; i < len(pattern); i++ {
+		if pattern[i] == '*' {
+			return true
+		}
+	}
+	return false
+}
+
+// On 订阅事件
+func (p *Bus) On(pattern string, handler core.Handler) uint64 {
+	if handler == nil {
+		return 0
+	}
+
+	id := p.nextID.Add(1)
+	sub := &subscription{
+		id:      id,
+		pattern: pattern,
+		handler: handler,
+	}
+
+	p.matcher.Add(pattern)
+
+	for {
+		old := p.subsPtr.Load()
+		newSubs := make([]*subscription, len(old.subs)+1)
+		copy(newSubs, old.subs)
+		newSubs[len(old.subs)] = sub
+
+		if p.subsPtr.CompareAndSwap(old, buildFlowSnapshot(newSubs)) {
+			break
+		}
+	}
+
+	return id
+}
+
+// Off 取消订阅
+func (p *Bus) Off(id uint64) {
+	if id == 0 {
+		return
+	}
+
+	for {
+		old := p.subsPtr.Load()
+		found := false
+		for i, sub := range old.subs {
+			if sub.id == id {
+				newSubs := make([]*subscription, 0, len(old.subs)-1)
+				newSubs = append(newSubs, old.subs[:i]...)
+				newSubs = append(newSubs, old.subs[i+1:]...)
+
+				p.matcher.Remove(sub.pattern)
+
+				if p.subsPtr.CompareAndSwap(old, buildFlowSnapshot(newSubs)) {
+					return
+				}
+				found = true
+				break
+			}
+		}
+		if !found {
+			return
+		}
+	}
+}
+
+// Emit 发射单个事件（无锁，直接Push到RingBuffer）
+// 快慢路径分离: 慢路径（buffer满）提取为独立函数，避免编译器内联快速路径时引入慢路径代码
+func (p *Bus) Emit(evt *core.Event) error {
+	if evt == nil || p.closed.Load() {
+		return nil
+	}
+
+	p.emitted.Add(1)
+
+	shard := p.getShard(evt.Type)
+	if !p.buffers[shard].push(evt) {
+		// 慢路径: buffer满，尝试其他分片或同步降级
+		p.emitSlow(evt, shard)
+	}
+
+	// 非阻塞唤醒目标分片消费者（精准唤醒，避免惊群）
+	select {
+	case p.notifyChs[shard] <- struct{}{}:
+	default:
+	}
+
+	return nil
+}
+
+// UnsafeEmit 同 Emit（Flow 模式本身即零开销，panic 由 consumer 捕获）
+func (p *Bus) UnsafeEmit(evt *core.Event) error {
+	return p.Emit(evt)
+}
+
+// emitSlow buffer 满时的降级处理（独立函数，不影响 Emit 内联）
+//
+//go:noinline
+func (p *Bus) emitSlow(evt *core.Event, skipShard uint64) {
+	// 尝试其他分片（负载均衡）
+	for i := 0; i < p.numShards; i++ {
+		if uint64(i) == skipShard {
+			continue
+		}
+		if p.buffers[i].push(evt) {
+			return
+		}
+	}
+	// 所有buffer都满，同步降级处理避免丢数据
+	// 使用 processSingle 避免切片分配
+	p.processSingle(evt)
+}
+
+// EmitMatch 发射单个事件（匹配模式）
+// Flow 模式下等同 Emit — 通配符匹配在消费者侧的 processBatch 中完成,
+// 当存在通配符订阅时 (hasWildcard=true) 自动通过 TrieMatcher 展开。
+func (p *Bus) EmitMatch(evt *core.Event) error {
+	return p.Emit(evt)
+}
+
+// UnsafeEmitMatch 同 EmitMatch（Flow 模式本身即零开销，panic 由 consumer 捕获）
+func (p *Bus) UnsafeEmitMatch(evt *core.Event) error {
+	return p.Emit(evt)
+}
+
+// EmitBatch 批量发射事件
+// 优化: 单次 atomic 计数整批，避免 N 次 atomic 开销
+// 仅唤醒有数据写入的分片，避免惊群
+func (p *Bus) EmitBatch(events []*core.Event) error {
+	if len(events) == 0 || p.closed.Load() {
+		return nil
+	}
+
+	p.emitted.Add(uint64(len(events)))
+
+	// 位图跟踪有数据写入的分片（最多 64 分片覆盖）
+	var touched uint64
+	for _, evt := range events {
+		if evt == nil {
+			continue
+		}
+		shard := p.getShard(evt.Type)
+		if !p.buffers[shard].push(evt) {
+			p.emitSlow(evt, shard)
+		}
+		touched |= 1 << (shard & 63)
+	}
+
+	// 仅唤醒有数据的分片消费者
+	for i := 0; i < p.numShards && touched != 0; i++ {
+		if touched&(1<<(uint64(i)&63)) != 0 {
+			select {
+			case p.notifyChs[i] <- struct{}{}:
+			default:
+			}
+		}
+	}
+
+	return nil
+}
+
+// EmitMatchBatch 批量发射匹配事件
+func (p *Bus) EmitMatchBatch(events []*core.Event) error {
+	return p.EmitBatch(events)
+}
+
+// Flush 立即刷新当前批次（触发消费者处理）
+func (p *Bus) Flush() error {
+	if p.closed.Load() {
+		return nil
+	}
+	// 等待一小段时间让消费者处理
+	time.Sleep(p.batchTimeout)
+	return nil
+}
+
+// Close 关闭处理器
+func (p *Bus) Close() {
+	if !p.closed.CompareAndSwap(false, true) {
+		return
+	}
+
+	close(p.done)
+	p.wg.Wait()
+}
+
+// Drain 优雅关闭（等待队列排空或超时）
+func (p *Bus) Drain(timeout time.Duration) error {
+	if timeout <= 0 {
+		p.Close()
+		return nil
+	}
+	done := make(chan struct{})
+	go func() {
+		p.Close()
+		close(done)
+	}()
+	select {
+	case <-done:
+		return nil
+	case <-time.After(timeout):
+		return fmt.Errorf("flow: graceful close timed out after %v", timeout)
+	}
+}
+
+// Stats 获取运行时统计（实现 core.Bus 接口）
+func (p *Bus) Stats() core.Stats {
+	var depth int64
+	for _, rb := range p.buffers {
+		d := rb.tail.Load() - rb.head.Load()
+		depth += int64(d)
+	}
+	return core.Stats{
+		Emitted:   int64(p.emitted.Load()),
+		Processed: int64(p.processed.Load()),
+		Panics:    p.panics.Read(),
+		Depth:     depth,
+	}
+}
+
+// BatchStats 获取批处理统计（processed, batches）
+func (p *Bus) BatchStats() (processed, batches uint64) {
+	return p.processed.Load(), p.batches.Load()
+}
