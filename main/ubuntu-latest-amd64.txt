@@ -2,42 +2,42 @@
 # arch:   amd64
 # kernel: Linux 6.11.0-1018-azure x86_64
 # go:     go version go1.25.6 linux/amd64
-# sha:    e3d24e84ee891ee42d28e3fd1d3fc2f88f1869aa
+# sha:    8c03f84a4bd26f0e0fa11f65b01038583edab9b2
 # ref:    refs/heads/main
-# date:   2026-02-25T03:22:22Z
-BenchmarkImplSync-4                   	80081742	        13.90 ns/op	        71.96 M/s	       0 B/op	       0 allocs/op
-BenchmarkImplSync-4                   	91890270	        14.08 ns/op	        71.02 M/s	       0 B/op	       0 allocs/op
-BenchmarkImplSync-4                   	91317410	        14.02 ns/op	        71.33 M/s	       0 B/op	       0 allocs/op
-BenchmarkImplSyncUnsafe-4             	214100965	         5.628 ns/op	       177.7 M/s	       0 B/op	       0 allocs/op
-BenchmarkImplSyncUnsafe-4             	211565067	         5.698 ns/op	       175.5 M/s	       0 B/op	       0 allocs/op
-BenchmarkImplSyncUnsafe-4             	214218334	         5.602 ns/op	       178.5 M/s	       0 B/op	       0 allocs/op
-BenchmarkImplSyncHighConcurrency-4    	15886610	        80.99 ns/op	        12.35 M/s	       0 B/op	       0 allocs/op
-BenchmarkImplSyncHighConcurrency-4    	15424694	        84.39 ns/op	        11.85 M/s	       0 B/op	       0 allocs/op
-BenchmarkImplSyncHighConcurrency-4    	14757762	        80.30 ns/op	        12.45 M/s	       0 B/op	       0 allocs/op
-BenchmarkImplAsync-4                  	71890230	        21.14 ns/op	        47.31 M/s	       0 B/op	       0 allocs/op
-BenchmarkImplAsync-4                  	65626162	        20.75 ns/op	        48.19 M/s	       0 B/op	       0 allocs/op
-BenchmarkImplAsync-4                  	50150997	        20.39 ns/op	        49.04 M/s	       0 B/op	       0 allocs/op
-BenchmarkImplAsyncHighConcurrency-4   	85553882	        13.65 ns/op	        73.24 M/s	       0 B/op	       0 allocs/op
-BenchmarkImplAsyncHighConcurrency-4   	100000000	        14.65 ns/op	        68.24 M/s	       0 B/op	       0 allocs/op
-BenchmarkImplAsyncHighConcurrency-4   	80019075	        19.71 ns/op	        50.74 M/s	       0 B/op	       0 allocs/op
-BenchmarkImplFlow-4                   	17782700	        63.58 ns/op	        15.73 M/s	       0 B/op	       0 allocs/op
-BenchmarkImplFlow-4                   	19066646	        61.02 ns/op	        16.39 M/s	       0 B/op	       0 allocs/op
-BenchmarkImplFlow-4                   	23194611	        62.20 ns/op	        16.08 M/s	       0 B/op	       0 allocs/op
-BenchmarkImplFlowHighConcurrency-4    	11354456	       105.5 ns/op	         9.497 M/s	       0 B/op	       0 allocs/op
-BenchmarkImplFlowHighConcurrency-4    	11802564	       127.8 ns/op	         7.826 M/s	       0 B/op	       0 allocs/op
-BenchmarkImplFlowHighConcurrency-4    	11197660	       106.9 ns/op	         9.364 M/s	       0 B/op	       0 allocs/op
-BenchmarkScenarioBatchBulkInsert-4    	   45142	     26367 ns/op	        37.93 M/s	       0 B/op	       0 allocs/op
-BenchmarkScenarioBatchBulkInsert-4    	   48379	     24736 ns/op	        40.43 M/s	       0 B/op	       0 allocs/op
-BenchmarkScenarioBatchBulkInsert-4    	   48266	     25485 ns/op	        39.24 M/s	       0 B/op	       0 allocs/op
-BenchmarkPerCPUCounterAdd-4           	447770316	         2.692 ns/op	       0 B/op	       0 allocs/op
-BenchmarkPerCPUCounterAdd-4           	447436102	         2.679 ns/op	       0 B/op	       0 allocs/op
-BenchmarkPerCPUCounterAdd-4           	447555865	         2.672 ns/op	       0 B/op	       0 allocs/op
-BenchmarkPerCPUCounterRead-4          	186603200	         6.346 ns/op	       0 B/op	       0 allocs/op
-BenchmarkPerCPUCounterRead-4          	189328770	         6.397 ns/op	       0 B/op	       0 allocs/op
-BenchmarkPerCPUCounterRead-4          	189089295	         6.382 ns/op	       0 B/op	       0 allocs/op
-BenchmarkPerCPUCounterAddParallel-4   	1000000000	         0.7509 ns/op	       0 B/op	       0 allocs/op
-BenchmarkPerCPUCounterAddParallel-4   	914234022	         1.325 ns/op	       0 B/op	       0 allocs/op
-BenchmarkPerCPUCounterAddParallel-4   	904022826	         1.334 ns/op	       0 B/op	       0 allocs/op
-BenchmarkAtomicInt64AddParallel-4     	63806816	        19.69 ns/op	       0 B/op	       0 allocs/op
-BenchmarkAtomicInt64AddParallel-4     	69836474	        19.80 ns/op	       0 B/op	       0 allocs/op
-BenchmarkAtomicInt64AddParallel-4     	62073692	        19.64 ns/op	       0 B/op	       0 allocs/op
+# date:   2026-02-25T03:33:35Z
+BenchmarkImplSync-4                   	72819244	        14.01 ns/op	        71.36 M/s	       0 B/op	       0 allocs/op
+BenchmarkImplSync-4                   	87254019	        14.02 ns/op	        71.34 M/s	       0 B/op	       0 allocs/op
+BenchmarkImplSync-4                   	87406232	        14.01 ns/op	        71.40 M/s	       0 B/op	       0 allocs/op
+BenchmarkImplSyncUnsafe-4             	202847445	         5.911 ns/op	       169.2 M/s	       0 B/op	       0 allocs/op
+BenchmarkImplSyncUnsafe-4             	202997175	         5.929 ns/op	       168.7 M/s	       0 B/op	       0 allocs/op
+BenchmarkImplSyncUnsafe-4             	202832886	         5.934 ns/op	       168.5 M/s	       0 B/op	       0 allocs/op
+BenchmarkImplSyncHighConcurrency-4    	15072139	        85.52 ns/op	        11.69 M/s	       0 B/op	       0 allocs/op
+BenchmarkImplSyncHighConcurrency-4    	15622410	        76.91 ns/op	        13.00 M/s	       0 B/op	       0 allocs/op
+BenchmarkImplSyncHighConcurrency-4    	14528629	        82.78 ns/op	        12.08 M/s	       0 B/op	       0 allocs/op
+BenchmarkImplAsync-4                  	69233865	        22.45 ns/op	        44.54 M/s	       0 B/op	       0 allocs/op
+BenchmarkImplAsync-4                  	47346756	        22.60 ns/op	        44.25 M/s	       0 B/op	       0 allocs/op
+BenchmarkImplAsync-4                  	47880196	        22.57 ns/op	        44.31 M/s	       0 B/op	       0 allocs/op
+BenchmarkImplAsyncHighConcurrency-4   	86317596	        21.30 ns/op	        46.95 M/s	       0 B/op	       0 allocs/op
+BenchmarkImplAsyncHighConcurrency-4   	56932470	        21.27 ns/op	        47.01 M/s	       0 B/op	       0 allocs/op
+BenchmarkImplAsyncHighConcurrency-4   	78530890	        22.43 ns/op	        44.59 M/s	       0 B/op	       0 allocs/op
+BenchmarkImplFlow-4                   	24414990	        63.63 ns/op	        15.72 M/s	       0 B/op	       0 allocs/op
+BenchmarkImplFlow-4                   	21620162	        65.68 ns/op	        15.22 M/s	       0 B/op	       0 allocs/op
+BenchmarkImplFlow-4                   	25887824	        65.86 ns/op	        15.18 M/s	       0 B/op	       0 allocs/op
+BenchmarkImplFlowHighConcurrency-4    	10799695	       109.2 ns/op	         9.156 M/s	       0 B/op	       0 allocs/op
+BenchmarkImplFlowHighConcurrency-4    	11038351	       106.1 ns/op	         9.424 M/s	       0 B/op	       0 allocs/op
+BenchmarkImplFlowHighConcurrency-4    	11323502	       109.8 ns/op	         9.116 M/s	       0 B/op	       0 allocs/op
+BenchmarkScenarioBatchBulkInsert-4    	   50266	     23910 ns/op	        41.83 M/s	       0 B/op	       0 allocs/op
+BenchmarkScenarioBatchBulkInsert-4    	   48578	     23945 ns/op	        41.76 M/s	       0 B/op	       0 allocs/op
+BenchmarkScenarioBatchBulkInsert-4    	   50779	     24160 ns/op	        41.39 M/s	       0 B/op	       0 allocs/op
+BenchmarkPerCPUCounterAdd-4           	498925395	         2.405 ns/op	       0 B/op	       0 allocs/op
+BenchmarkPerCPUCounterAdd-4           	499913190	         2.405 ns/op	       0 B/op	       0 allocs/op
+BenchmarkPerCPUCounterAdd-4           	498796598	         2.403 ns/op	       0 B/op	       0 allocs/op
+BenchmarkPerCPUCounterRead-4          	213898828	         5.618 ns/op	       0 B/op	       0 allocs/op
+BenchmarkPerCPUCounterRead-4          	214310745	         5.624 ns/op	       0 B/op	       0 allocs/op
+BenchmarkPerCPUCounterRead-4          	213547077	         5.730 ns/op	       0 B/op	       0 allocs/op
+BenchmarkPerCPUCounterAddParallel-4   	899882134	         6.573 ns/op	       0 B/op	       0 allocs/op
+BenchmarkPerCPUCounterAddParallel-4   	1000000000	         1.330 ns/op	       0 B/op	       0 allocs/op
+BenchmarkPerCPUCounterAddParallel-4   	922698786	         1.325 ns/op	       0 B/op	       0 allocs/op
+BenchmarkAtomicInt64AddParallel-4     	67347160	        17.89 ns/op	       0 B/op	       0 allocs/op
+BenchmarkAtomicInt64AddParallel-4     	67386666	        17.83 ns/op	       0 B/op	       0 allocs/op
+BenchmarkAtomicInt64AddParallel-4     	67664384	        17.86 ns/op	       0 B/op	       0 allocs/op
