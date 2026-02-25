@@ -1,0 +1,6 @@
+# 默认：文本文件自动归一化换行符
+* text=auto
+
+# Shell 脚本强制 LF（在 Windows 上 checkout 也保持 LF，否则 shebang 损坏无法执行）
+*.sh    text eol=lf
+.githooks/* text eol=lf
