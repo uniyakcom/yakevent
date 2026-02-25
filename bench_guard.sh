@@ -104,16 +104,14 @@ run_bench() {
     print_cpu_info
     echo "Running benchmarks (pattern=$BENCH_PATTERN, benchtime=$BENCHTIME, count=$COUNT)..."
     cd "$SCRIPT_DIR"
-    # -json 实时流式输出，逐行显示并写入文件（覆盖）
-    go test -json . \
+    go test . \
         -bench="$BENCH_PATTERN" \
         -benchmem \
         -benchtime="$BENCHTIME" \
         -count="$COUNT" \
         -run='^$' \
         -timeout=300s 2>&1 \
-        | grep --line-buffered '"Output":"Benchmark' \
-        | sed -u 's/.*"Output":"//; s/\\n".*//; s/\\t/\t/g' \
+        | grep --line-buffered '^Benchmark' \
         | tee "$outfile"
     if [[ ! -s "$outfile" ]]; then
         echo "ERROR: No benchmark results collected." >&2

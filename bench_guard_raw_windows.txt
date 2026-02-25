@@ -1,0 +1,15 @@
+BenchmarkImplSync-12     	128364225	        18.19 ns/op	        54.97 M/s	       0 B/op	       0 allocs/op
+BenchmarkImplSync-12     	131827272	        18.25 ns/op	        54.80 M/s	       0 B/op	       0 allocs/op
+BenchmarkImplSync-12     	130840808	        18.28 ns/op	        54.72 M/s	       0 B/op	       0 allocs/op
+BenchmarkImplSync-12     	131113393	        18.18 ns/op	        55.00 M/s	       0 B/op	       0 allocs/op
+BenchmarkImplSync-12     	131086473	        18.22 ns/op	        54.89 M/s	       0 B/op	       0 allocs/op
+BenchmarkImplAsync-12    	79374528	        33.03 ns/op	        30.27 M/s	       0 B/op	       0 allocs/op
+BenchmarkImplAsync-12    	77421852	        33.17 ns/op	        30.15 M/s	       0 B/op	       0 allocs/op
+BenchmarkImplAsync-12    	73170730	        32.64 ns/op	        30.64 M/s	       0 B/op	       0 allocs/op
+BenchmarkImplAsync-12    	71746734	        32.97 ns/op	        30.33 M/s	       0 B/op	       0 allocs/op
+BenchmarkImplAsync-12    	66976618	        32.91 ns/op	        30.39 M/s	       0 B/op	       0 allocs/op
+BenchmarkImplFlow-12     	22846350	       119.9 ns/op	         8.343 M/s	       0 B/op	       0 allocs/op
+BenchmarkImplFlow-12     	20771648	       117.8 ns/op	         8.489 M/s	       0 B/op	       0 allocs/op
+BenchmarkImplFlow-12     	25474515	       116.3 ns/op	         8.595 M/s	       0 B/op	       0 allocs/op
+BenchmarkImplFlow-12     	20822325	       118.9 ns/op	         8.408 M/s	       0 B/op	       0 allocs/op
+BenchmarkImplFlow-12     	22358150	       116.8 ns/op	         8.561 M/s	       0 B/op	       0 allocs/op
