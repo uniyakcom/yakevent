@@ -15,8 +15,8 @@
 #   3. 与基线对比，超阈值 → exit 1
 #
 # 用法:
-#   ./bench_guard.sh                     # CI 模式: 绝对值对比
-#   ./bench_guard.sh --update-baseline   # 更新绝对值基线
+#   ./bench_guard.sh                     # 回归检查（无基线时自动创建）
+#   ./bench_guard.sh force               # 强制重建基线
 #   BENCH_THRESHOLD=20 ./bench_guard.sh  # 自定义阈值（默认 15%）
 #
 # 注意: 跨 Runner / 不同硬件的对比不可靠，本脚本仅用于同环境回归检测。
@@ -30,7 +30,7 @@ case "$OS_NAME" in
     mingw*|msys*|cygwin*) OS_NAME="windows" ;;
 esac
 BASELINE="$SCRIPT_DIR/bench_guard_baseline_${OS_NAME}.txt"
-ABS_BASELINE_RAW="$SCRIPT_DIR/bench_guard_raw_${OS_NAME}.txt"
+ABS_BASELINE_RAW="$SCRIPT_DIR/bench_guard_raw_${OS_NAME}.txt"   # 每次覆盖：测试数据 + 分析结果
 THRESHOLD="${BENCH_THRESHOLD:-15}"   # ns/op 回归阈值百分比
 BENCHTIME="${BENCH_TIME:-2s}"
 COUNT="${BENCH_COUNT:-5}"
@@ -104,14 +104,21 @@ run_bench() {
     print_cpu_info
     echo "Running benchmarks (pattern=$BENCH_PATTERN, benchtime=$BENCHTIME, count=$COUNT)..."
     cd "$SCRIPT_DIR"
-    go test ./... \
+    # -json 实时流式输出，逐行显示并写入文件（覆盖）
+    go test -json . \
         -bench="$BENCH_PATTERN" \
         -benchmem \
         -benchtime="$BENCHTIME" \
         -count="$COUNT" \
         -run='^$' \
-        -timeout=300s \
-        2>/dev/null | grep '^Benchmark' > "$outfile" || true
+        -timeout=300s 2>&1 \
+        | grep --line-buffered '"Output":"Benchmark' \
+        | sed -u 's/.*"Output":"//; s/\\n".*//; s/\\t/\t/g' \
+        | tee "$outfile"
+    if [[ ! -s "$outfile" ]]; then
+        echo "ERROR: No benchmark results collected." >&2
+        exit 1
+    fi
     echo "  $(wc -l < "$outfile") result lines"
 }
 
@@ -130,16 +137,12 @@ compute_baseline() {
 }
 
 # ── 模式: 更新基线 ──
-if [[ "${1:-}" == "--update-baseline" ]]; then
-    CURRENT=$(mktemp /tmp/bench_current_XXXXXX.txt)
-    trap "rm -f $CURRENT" EXIT
-
-    run_bench "$CURRENT"
+if [[ "${1:-}" == "force" ]]; then
+    run_bench "$ABS_BASELINE_RAW"
 
     echo ""
     echo "=== Computing baseline ==="
-    compute_baseline "$CURRENT" > "$BASELINE"
-    cp "$CURRENT" "$ABS_BASELINE_RAW"
+    compute_baseline "$ABS_BASELINE_RAW" > "$BASELINE"
 
     echo ""
     echo "Baseline updated: $BASELINE"
@@ -153,70 +156,85 @@ if [[ "${1:-}" == "--update-baseline" ]]; then
 fi
 
 # ── 模式: CI 回归检查 ──
-[[ -f "$BASELINE" ]] || die "No baseline found. Run: $0 --update-baseline"
-
-CURRENT=$(mktemp /tmp/bench_current_XXXXXX.txt)
-trap "rm -f $CURRENT" EXIT
-
-run_bench "$CURRENT"
-
-echo ""
-echo "=== Performance regression check (threshold: ${THRESHOLD}%) ==="
-echo ""
-
-regression_found=false
-
-while IFS=' ' read -r name base_ns base_allocs; do
-    cur_ns=$(extract_median "$name" "$CURRENT")
-    cur_allocs=$(extract_allocs "$name" "$CURRENT")
-
-    if [[ "$cur_ns" == "0" || -z "$cur_ns" ]]; then
-        echo "⚠️  $name: no current data (skipped)"
-        continue
-    fi
-
-    # 计算 ns/op 变化百分比
-    pct_change=$(awk "BEGIN{printf \"%.2f\", ($cur_ns - $base_ns) / $base_ns * 100}")
-    abs_pct=$(echo "$pct_change" | tr -d '-')
-    is_regression=$(awk "BEGIN{print ($pct_change > 0) ? 1 : 0}")
-    exceeds=$(awk "BEGIN{print ($abs_pct > $THRESHOLD) ? 1 : 0}")
-
-    if [[ "$is_regression" == "1" && "$exceeds" == "1" ]]; then
-        printf "❌ %-30s %8s → %8s ns/op  (%+.1f%% > %s%%)\n" \
-            "$name" "$base_ns" "$cur_ns" "$pct_change" "$THRESHOLD"
-        regression_found=true
-    else
-        status="✅"
-        [[ "$is_regression" == "1" ]] && status="⚠️ "
-        printf "%s %-30s %8s → %8s ns/op  (%+.1f%%)\n" \
-            "$status" "$name" "$base_ns" "$cur_ns" "$pct_change"
-    fi
-
-    # allocs/op 严格检测（仅报告，不阻塞）
-    if [[ "$base_allocs" != "0" && "$cur_allocs" != "$base_allocs" ]]; then
-        alloc_change=$(awk "BEGIN{printf \"%.1f\", ($cur_allocs - $base_allocs) / $base_allocs * 100}")
-        printf "   ↳ allocs/op: %s → %s (%+.1f%%)\n" "$base_allocs" "$cur_allocs" "$alloc_change"
-    fi
-    if [[ "$base_allocs" == "0" && "$cur_allocs" != "0" ]]; then
-        printf "   ↳ ⚠️  allocs/op: was 0, now %s\n" "$cur_allocs"
-    fi
-done < "$BASELINE"
-
-# ── 可选: benchstat 绝对值展示 ──
-if [[ -f "$ABS_BASELINE_RAW" ]] && command -v benchstat &>/dev/null; then
+if [[ ! -f "$BASELINE" ]]; then
+    echo "No baseline found, creating automatically..."
+    run_bench "$ABS_BASELINE_RAW"
+    compute_baseline "$ABS_BASELINE_RAW" > "$BASELINE"
     echo ""
-    echo "=== benchstat comparison (informational) ==="
-    echo "    注意: 基线与当前测试须在同一硬件上，否则对比无意义"
+    echo "Baseline created: $BASELINE"
+    echo "Baseline values:"
+    while IFS=' ' read -r name ns allocs; do
+        printf "  %-30s %8s ns/op   %s allocs/op\n" "$name" "$ns" "$allocs"
+    done < "$BASELINE"
     echo ""
-    benchstat "$ABS_BASELINE_RAW" "$CURRENT" 2>&1 || true
+    echo "✅ Baseline initialized. Run again to check for regressions."
+    exit 0
 fi
 
-echo ""
-if $regression_found; then
-    echo "❌ Performance regression detected (ns/op threshold: ${THRESHOLD}%)"
+run_bench "$ABS_BASELINE_RAW"
+
+# 分析结果同步写入文件末尾（tee -a 追加到已有测试数据后）
+{
     echo ""
-    echo "   To update baseline: $0 --update-baseline"
+    echo "=== Performance regression check (threshold: ${THRESHOLD}%) ==="
+    echo ""
+
+    regression_found=false
+
+    while IFS=' ' read -r name base_ns base_allocs; do
+        cur_ns=$(extract_median "$name" "$ABS_BASELINE_RAW")
+        cur_allocs=$(extract_allocs "$name" "$ABS_BASELINE_RAW")
+
+        if [[ "$cur_ns" == "0" || -z "$cur_ns" ]]; then
+            echo "⚠️  $name: no current data (skipped)"
+            continue
+        fi
+
+        # 计算 ns/op 变化百分比
+        pct_change=$(awk "BEGIN{printf \"%.2f\", ($cur_ns - $base_ns) / $base_ns * 100}")
+        abs_pct=$(echo "$pct_change" | tr -d '-')
+        is_regression=$(awk "BEGIN{print ($pct_change > 0) ? 1 : 0}")
+        exceeds=$(awk "BEGIN{print ($abs_pct > $THRESHOLD) ? 1 : 0}")
+
+        if [[ "$is_regression" == "1" && "$exceeds" == "1" ]]; then
+            printf "❌ %-30s %8s → %8s ns/op  (%+.1f%% > %s%%)\n" \
+                "$name" "$base_ns" "$cur_ns" "$pct_change" "$THRESHOLD"
+            regression_found=true
+        else
+            status="✅"
+            [[ "$is_regression" == "1" ]] && status="⚠️ "
+            printf "%s %-30s %8s → %8s ns/op  (%+.1f%%)\n" \
+                "$status" "$name" "$base_ns" "$cur_ns" "$pct_change"
+        fi
+
+        # allocs/op 严格检测（仅报告，不阻塞）
+        if [[ "$base_allocs" != "0" && "$cur_allocs" != "$base_allocs" ]]; then
+            alloc_change=$(awk "BEGIN{printf \"%.1f\", ($cur_allocs - $base_allocs) / $base_allocs * 100}")
+            printf "   ↳ allocs/op: %s → %s (%+.1f%%)\n" "$base_allocs" "$cur_allocs" "$alloc_change"
+        fi
+        if [[ "$base_allocs" == "0" && "$cur_allocs" != "0" ]]; then
+            printf "   ↳ ⚠️  allocs/op: was 0, now %s\n" "$cur_allocs"
+        fi
+    done < "$BASELINE"
+
+    # ── 可选: benchstat 绝对值展示 ──
+    if command -v benchstat &>/dev/null; then
+        echo ""
+        echo "=== benchstat (informational) ==="
+        benchstat "$ABS_BASELINE_RAW" 2>&1 || true
+    fi
+
+    echo ""
+    if $regression_found; then
+        echo "❌ Performance regression detected (ns/op threshold: ${THRESHOLD}%)"
+        echo ""
+        echo "   To update baseline: $0 force"
+    else
+        echo "✅ No performance regression (ns/op threshold: ${THRESHOLD}%)"
+    fi
+} | tee -a "$ABS_BASELINE_RAW"
+
+# tee 完成后从文件检测是否有回归行，决定退出码
+if grep -q '^❌ Performance' "$ABS_BASELINE_RAW" 2>/dev/null; then
     exit 1
-else
-    echo "✅ No performance regression (ns/op threshold: ${THRESHOLD}%)"
 fi

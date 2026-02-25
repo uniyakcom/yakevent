@@ -9,7 +9,7 @@
 _pprof/
 
 # ── 基准测试临时文件 ──
-bench_*.txt
+!bench_*.txt
 
 # ── IDE / 编辑器 ──
 .idea/

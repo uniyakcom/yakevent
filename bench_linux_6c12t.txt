@@ -1,0 +1,58 @@
+# 2026-02-25 06:08:51 CST
+# Linux 6.17.0-14-generic x86_64
+# go1.25.7
+# CPU: Intel(R) Xeon(R) E-2186G CPU @ 3.80GHz
+
+goos: linux
+goarch: amd64
+pkg: github.com/uniyakcom/yakevent
+cpu: Intel(R) Xeon(R) E-2186G CPU @ 3.80GHz
+
+BenchmarkImplSync
+BenchmarkImplSync-12                    	75247748	        14.23 ns/op	        70.30 M/s	       0 B/op	       0 allocs/op
+BenchmarkImplSync-12                    	83607822	        13.85 ns/op	        72.22 M/s	       0 B/op	       0 allocs/op
+BenchmarkImplSync-12                    	82610172	        13.82 ns/op	        72.38 M/s	       0 B/op	       0 allocs/op
+BenchmarkImplSyncUnsafe
+BenchmarkImplSyncUnsafe-12              	302274768	         3.772 ns/op	       265.1 M/s	       0 B/op	       0 allocs/op
+BenchmarkImplSyncUnsafe-12              	305043207	         3.823 ns/op	       261.6 M/s	       0 B/op	       0 allocs/op
+BenchmarkImplSyncUnsafe-12              	296595643	         3.764 ns/op	       265.7 M/s	       0 B/op	       0 allocs/op
+BenchmarkImplSyncHighConcurrency
+BenchmarkImplSyncHighConcurrency-12     	50944197	        20.50 ns/op	        48.78 M/s	       0 B/op	       0 allocs/op
+BenchmarkImplSyncHighConcurrency-12     	59167894	        19.21 ns/op	        52.07 M/s	       0 B/op	       0 allocs/op
+BenchmarkImplSyncHighConcurrency-12     	57733360	        19.79 ns/op	        50.53 M/s	       0 B/op	       0 allocs/op
+BenchmarkImplAsync
+BenchmarkImplAsync-12                   	48411788	        22.25 ns/op	        44.95 M/s	       0 B/op	       0 allocs/op
+BenchmarkImplAsync-12                   	48547653	        22.60 ns/op	        44.24 M/s	       0 B/op	       0 allocs/op
+BenchmarkImplAsync-12                   	50218600	        22.78 ns/op	        43.90 M/s	       0 B/op	       0 allocs/op
+BenchmarkImplAsyncHighConcurrency
+BenchmarkImplAsyncHighConcurrency-12    	70467048	        20.38 ns/op	        49.08 M/s	       0 B/op	       0 allocs/op
+BenchmarkImplAsyncHighConcurrency-12    	86331649	        14.98 ns/op	        66.74 M/s	       0 B/op	       0 allocs/op
+BenchmarkImplAsyncHighConcurrency-12    	80919187	        16.21 ns/op	        61.71 M/s	       0 B/op	       0 allocs/op
+BenchmarkImplFlow
+BenchmarkImplFlow-12                    	16275369	        74.17 ns/op	        13.48 M/s	       0 B/op	       0 allocs/op
+BenchmarkImplFlow-12                    	14924056	        73.53 ns/op	        13.60 M/s	       0 B/op	       0 allocs/op
+BenchmarkImplFlow-12                    	14490099	        79.25 ns/op	        12.62 M/s	       0 B/op	       0 allocs/op
+BenchmarkImplFlowHighConcurrency
+BenchmarkImplFlowHighConcurrency-12     	13459659	        91.20 ns/op	        10.98 M/s	       0 B/op	       0 allocs/op
+BenchmarkImplFlowHighConcurrency-12     	12680449	        96.72 ns/op	        10.38 M/s	       0 B/op	       0 allocs/op
+BenchmarkImplFlowHighConcurrency-12     	10904222	        94.28 ns/op	        10.61 M/s	       0 B/op	       0 allocs/op
+BenchmarkScenarioBatchBulkInsert
+BenchmarkScenarioBatchBulkInsert-12     	   22953	     49009 ns/op	        20.41 M/s	       1 B/op	       0 allocs/op
+BenchmarkScenarioBatchBulkInsert-12     	   27886	     46146 ns/op	        21.67 M/s	       0 B/op	       0 allocs/op
+BenchmarkScenarioBatchBulkInsert-12     	   26560	     51584 ns/op	        19.39 M/s	       0 B/op	       0 allocs/op
+BenchmarkPerCPUCounterAdd
+BenchmarkPerCPUCounterAdd-12            	211697493	         5.528 ns/op	       0 B/op	       0 allocs/op
+BenchmarkPerCPUCounterAdd-12            	214482991	         5.482 ns/op	       0 B/op	       0 allocs/op
+BenchmarkPerCPUCounterAdd-12            	212597324	         5.520 ns/op	       0 B/op	       0 allocs/op
+BenchmarkPerCPUCounterRead
+BenchmarkPerCPUCounterRead-12           	142667997	         8.153 ns/op	       0 B/op	       0 allocs/op
+BenchmarkPerCPUCounterRead-12           	145636230	         8.153 ns/op	       0 B/op	       0 allocs/op
+BenchmarkPerCPUCounterRead-12           	144086552	         8.313 ns/op	       0 B/op	       0 allocs/op
+BenchmarkPerCPUCounterAddParallel
+BenchmarkPerCPUCounterAddParallel-12    	148266072	         7.044 ns/op	       0 B/op	       0 allocs/op
+BenchmarkPerCPUCounterAddParallel-12    	272525767	         8.380 ns/op	       0 B/op	       0 allocs/op
+BenchmarkPerCPUCounterAddParallel-12    	220050372	         6.291 ns/op	       0 B/op	       0 allocs/op
+BenchmarkAtomicInt64AddParallel
+BenchmarkAtomicInt64AddParallel-12      	71837943	        16.63 ns/op	       0 B/op	       0 allocs/op
+BenchmarkAtomicInt64AddParallel-12      	68587959	        16.74 ns/op	       0 B/op	       0 allocs/op
+BenchmarkAtomicInt64AddParallel-12      	67415578	        16.82 ns/op	       0 B/op	       0 allocs/op

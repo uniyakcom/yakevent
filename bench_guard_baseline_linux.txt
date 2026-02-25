@@ -1,0 +1,3 @@
+BenchmarkImplSync 13.67 0
+BenchmarkImplAsync 22.21 0
+BenchmarkImplFlow 76.93 0

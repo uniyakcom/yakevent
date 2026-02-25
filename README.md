@@ -286,14 +286,19 @@ go test -bench=. -benchmem -benchtime=1s -count=3 -run=^$
 # 自定义参数: benchtime=3s, count=5
 ./bench.sh 3s 5
 
-# 性能回归检查（与本地基线对比，阈值默认 15%）
+# 性能回归检查（首次无基线时自动创建，阈值默认 15%）
 ./bench_guard.sh
 
-# 更新当前平台基线
-./bench_guard.sh --update-baseline
+# 强制重建基线（硬件变更后）
+./bench_guard.sh force
 ```
 
-`bench_guard.sh` 守卫 `BenchmarkImplSync` / `BenchmarkImplAsync` / `BenchmarkImplFlow` 三个单线程稳定基准的 ns/op 中位数，超出阈值退出码为 1。基线文件（`bench_guard_baseline_{os}.txt`）按平台区分，存入仓库供本地参考。
+`bench_guard.sh` 守卫 `BenchmarkImplSync` / `BenchmarkImplAsync` / `BenchmarkImplFlow` 三个单线程稳定基准的 ns/op 中位数，超出阈值退出码为 1。每次运行生成两个持久文件（按平台区分）：
+
+| 文件 | 内容 | 更新时机 |
+|---|---|---|
+| `bench_guard_baseline_{os}.txt` | 各基准中位数（用于对比） | 首次运行 / `force` |
+| `bench_guard_raw_{os}.txt` | 原始测试数据 + 对比分析结果 | 每次运行覆盖 |
 
 CI 基准测试由 `bench.yml` 驱动，4 平台并发：
 

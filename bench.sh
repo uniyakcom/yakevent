@@ -48,13 +48,10 @@ echo ""
 # 运行基准测试
 echo "Running benchmarks..."
 cd "$SCRIPT_DIR"
-go test ./... -bench='^Benchmark' -benchmem -benchtime="$BENCHTIME" -count="$COUNT" -run='^$' 2>&1 | tee /dev/stderr | grep '^Benchmark' >> "$OUTFILE"
-
-# 写入尾部
-{
-    echo ""
-    echo "PASS"
-} >> "$OUTFILE"
+go test -json . ./util/ -bench='^Benchmark' -benchmem -benchtime="$BENCHTIME" -count="$COUNT" -run='^$' 2>&1 \
+    | grep --line-buffered '"Output":"Benchmark' \
+    | sed -u 's/.*"Output":"//; s/\\n".*//; s/\\t/\t/g' \
+    | tee -a "$OUTFILE"
 
 echo ""
 echo "=== Results saved to $OUTFILE ==="
