@@ -18,7 +18,7 @@ High-performance in-process event bus for Go — 3 implementations · 2 publish 
 - **2 种发布模式**: `Emit`（安全路径，defer/recover 保护）/ `UnsafeEmit`（零保护，极致性能）
 - **4 层 API**: 零配置 `New()` / 场景 `ForXxx()` / 字符串 `Scenario()` / 完全控制 `Option()`
 - **零分配 Emit**: 全部三实现 0 B/op, 0 allocs/op
-- **极致性能**: UnsafeEmit ~5.6 ns（178 M/s），Sync Emit ~14 ns，Async ~22 ns（44 M/s）
+- **极致性能**: UnsafeEmit ~3.8 ns（265 M/s），Sync Emit ~14 ns，Async ~23 ns（44 M/s）
 - **零 CAS 热路径**: Per-P SPSC ring，atomic Load/Store only（x86 ≈ 普通 MOV）
 - **模式匹配**: 通配符 `*`（单层）和 `**`（多层）
 - **可插拔中间件**: recoverer / retry / timeout / logging（Logger 接口，支持注入 zerolog/zap）
@@ -33,15 +33,19 @@ High-performance in-process event bus for Go — 3 implementations · 2 publish 
 go test -bench="BenchmarkImpl" -benchmem -benchtime=1s -count=3 -run="^$"
 ```
 
-#### Linux — Intel Xeon Platinum @ 2.50GHz (1C/2T, 2 vCPU)
+#### Linux — Intel Xeon E-2186G @ 3.80GHz（6C/12T）<sup>[1]</sup>
 
-| 场景 | ns/op | allocs/op |
-|------|------:|----------:|
-| **UnsafeEmit 单线程** | **5.6 ns** | 0 |
-| **Sync Emit 单线程** | **14 ns** | 0 |
-| **Async 单线程** | **22 ns** | 0 |
-| **Async 高并发** | **21 ns** | 0 |
-| **Flow 批量吞吐** | **43 M/s** | 0 |
+| 场景 | ns/op | M/s | allocs/op |
+|------|------:|----:|----------:|
+| **UnsafeEmit 单线程** | **3.8 ns** | 265 | 0 |
+| **Sync Emit 单线程** | **14 ns** | 72 | 0 |
+| **Async 单线程** | **23 ns** | 44 | 0 |
+| **Async 高并发** | **16 ns** | 62 | 0 |
+| **Flow 单线程** | **74 ns** | 13 | 0 |
+| **Flow 高并发** | **94 ns** | 10 | 0 |
+| **场景批量插入** | **49 µs/op** | 20 | 0 |
+
+<sup>[1]</sup> 数据来源：[bench_linux_6c12t.txt](bench_linux_6c12t.txt)，`go test -benchtime=1s -count=3`，Go 1.25.7，Linux 6.17，本地裸机。CI Runner 数据见 [bench](#bench-分支基准存档) 分支。
 
 ---
 
@@ -117,9 +121,11 @@ bus.On("order.created", handler)
 
 | 实现 | 核心技术 | 适用场景 | Emit | UnsafeEmit | 高并发 | error 返回 |
 |------|---------|---------|:---:|:---:|:---:|:---:|
-| **Sync** | 同步直调 + CoW atomic.Pointer | RPC 钩子、权限校验、API 中间件 | **14 ns** | **5.6 ns** | 72 ns | ✅ |
-| **Async** | Per-P SPSC ring + RCU + 三级空转 | 事件总线、日志聚合、实时推送 | 22 ns | = Emit | **21 ns** | ❌ |
-| **Flow** | MPSC ring + Stage Pipeline | ETL 流处理、窗口聚合、批量数据加载 | 66 ns | — | 108 ns | ❌ |
+| **Sync** | 同步直调 + CoW atomic.Pointer | RPC 钩子、权限校验、API 中间件 | **14 ns** | **3.8 ns** | 20 ns | ✅ |
+| **Async** | Per-P SPSC ring + RCU + 三级空转 | 事件总线、日志聚合、实时推送 | 23 ns | = Emit | **16 ns** | ❌ |
+| **Flow** | MPSC ring + Stage Pipeline | ETL 流处理、窗口聚合、批量数据加载 | 74 ns | — | 94 ns | ❌ |
+
+<sup>数据来源: [`bench_linux_6c12t.txt`](bench_linux_6c12t.txt)，Intel Xeon E-2186G @ 3.80GHz 6C/12T</sup>
 
 ### 2 种发布模式
 
@@ -311,6 +317,8 @@ CI 基准测试由 `bench.yml` 驱动，4 平台并发：
 
 PR 时同机器对比 HEAD 与 base，`benchstat` 输出差异百分比。结果归档到独立的 `bench` 分支：
 
+### bench 分支基准存档
+
 ```
 bench 分支/
 ├── main/                          # push to main 后自动更新
@@ -325,6 +333,22 @@ bench 分支/
 └── manual/YYYYMMDD/               # 手动触发时写入
     └── {os}-{arch}.txt
 ```
+
+每个文件头部包含环境元数据（os / arch / kernel / go version / commit sha / date），可直接用 `benchstat` 横向对比：
+
+```bash
+# 查看 CI 最新 main 分支数据
+git fetch origin bench
+git show origin/bench:main/ubuntu-latest-amd64.txt
+
+# 与本地裸机数据对比（跨硬件仅供参考）
+benchstat bench_linux_6c12t.txt <(git show origin/bench:main/ubuntu-latest-amd64.txt)
+
+# 查看某个 PR 的回归对比
+git show origin/bench:pr-42/ubuntu-latest-amd64-diff.txt
+```
+
+> **注意**：CI Runner（共享虚拟机）与本地裸机存在系统性性能差异，跨环境 ns/op 数值不可直接比较。同一 Runner 上的 PR 对比（`*-diff.txt`）才有统计意义。
 
 ---
 
