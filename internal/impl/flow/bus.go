@@ -45,7 +45,7 @@ type RB struct {
 
 	// 消费者
 	head atomic.Uint64
-	_2   [56]byte // 缓存行填充
+	_    [56]byte // 缓存行填充
 
 	buf  []flowSlot
 	cap  uint64
@@ -323,14 +323,14 @@ func (p *Bus) processBatch(events []*core.Event) {
 			// 最快路径: 仅 1 种事件类型，跳过 map hash+lookup
 			for _, evt := range current {
 				for _, h := range snap.singleHandlers {
-					h(evt)
+					_ = h(evt)
 				}
 			}
 		} else if !snap.hasWildcard {
 			// 快速路径: 仅精确匹配，直接 map 索引，零分配
 			for _, evt := range current {
 				for _, h := range snap.handlers[evt.Type] {
-					h(evt)
+					_ = h(evt)
 				}
 			}
 		} else {
@@ -339,7 +339,7 @@ func (p *Bus) processBatch(events []*core.Event) {
 				patterns := p.matcher.Match(evt.Type)
 				for _, pat := range *patterns {
 					for _, h := range snap.handlers[pat] {
-						h(evt)
+						_ = h(evt)
 					}
 				}
 				p.matcher.Put(patterns)
@@ -376,17 +376,17 @@ func (p *Bus) processSingle(evt *core.Event) {
 		if snap.singleKey != "" {
 			// 最快路径: 仅 1 种事件类型，跳过 map hash+lookup
 			for _, h := range snap.singleHandlers {
-				h(evt)
+				_ = h(evt)
 			}
 		} else if !snap.hasWildcard {
 			for _, h := range snap.handlers[evt.Type] {
-				h(evt)
+				_ = h(evt)
 			}
 		} else {
 			patterns := p.matcher.Match(evt.Type)
 			for _, pat := range *patterns {
 				for _, h := range snap.handlers[pat] {
-					h(evt)
+					_ = h(evt)
 				}
 			}
 			p.matcher.Put(patterns)

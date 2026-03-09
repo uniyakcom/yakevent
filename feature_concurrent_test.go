@@ -43,7 +43,7 @@ func TestConcurrentEmit(t *testing.T) {
 		go func() {
 			defer wg.Done()
 			for j := 0; j < eventsPerGoroutine; j++ {
-				bus.Emit(&Event{Type: "concurrent.emit", Data: []byte("test")})
+				_ = bus.Emit(&Event{Type: "concurrent.emit", Data: []byte("test")})
 			}
 		}()
 	}
@@ -82,7 +82,7 @@ func TestConcurrentOnOffEmit(t *testing.T) {
 		go func() {
 			defer wg.Done()
 			for j := 0; j < 50; j++ {
-				bus.Emit(&Event{Type: "mixed.test", Data: []byte("data")})
+				_ = bus.Emit(&Event{Type: "mixed.test", Data: []byte("data")})
 				time.Sleep(time.Millisecond)
 			}
 		}()
@@ -117,7 +117,7 @@ func TestRaceConditions(t *testing.T) {
 		go func() {
 			defer wg.Done()
 			for j := 0; j < 10; j++ {
-				bus.Emit(&Event{Type: "race.test", Data: []byte("test")})
+				_ = bus.Emit(&Event{Type: "race.test", Data: []byte("test")})
 			}
 		}()
 	}
@@ -159,7 +159,7 @@ func TestConcurrentPatternMatching(t *testing.T) {
 		go func(evtType string) {
 			defer wg.Done()
 			for i := 0; i < 50; i++ {
-				bus.EmitMatch(&Event{Type: evtType, Data: []byte("data")})
+				_ = bus.EmitMatch(&Event{Type: evtType, Data: []byte("data")})
 			}
 		}(et)
 	}
@@ -192,7 +192,7 @@ func TestConcurrentBatchEmit(t *testing.T) {
 			for j := range events {
 				events[j] = &Event{Type: "batch.test", Data: []byte("data")}
 			}
-			bus.EmitBatch(events)
+			_ = bus.EmitBatch(events)
 		}()
 	}
 	wg.Wait()
@@ -244,8 +244,8 @@ func TestNestedHandlerOff(t *testing.T) {
 	})
 
 	evt := &Event{Type: "self-cancel"}
-	bus.Emit(evt)
-	bus.Emit(evt)
+	_ = bus.Emit(evt)
+	_ = bus.Emit(evt)
 
 	if callCount != 1 {
 		t.Errorf("expected 1 call, got %d", callCount)
@@ -264,7 +264,7 @@ func TestConcurrentClose(t *testing.T) {
 		go func() {
 			defer wg.Done()
 			for j := 0; j < 100; j++ {
-				bus.Emit(&Event{Type: "test", Data: []byte("data")})
+				_ = bus.Emit(&Event{Type: "test", Data: []byte("data")})
 			}
 		}()
 	}

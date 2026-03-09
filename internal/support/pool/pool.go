@@ -21,11 +21,6 @@ type ArenaChunk struct {
 	offset atomic.Int64
 }
 
-func newArenaChunk() *ArenaChunk {
-	a := &ArenaChunk{buf: make([]byte, arenaChunkSize)}
-	return a
-}
-
 // Alloc CAS bump allocator — 无锁热路径
 func (a *ArenaChunk) Alloc(n int) []byte {
 	aligned := int64((n + 7) &^ 7)

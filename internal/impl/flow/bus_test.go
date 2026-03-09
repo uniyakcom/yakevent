@@ -58,9 +58,9 @@ func TestFlowSubscription(t *testing.T) {
 		t.Fatal("expected non-zero subscription ID")
 	}
 
-	proc.Emit(&core.Event{Type: "test.foo"})
-	proc.Emit(&core.Event{Type: "test.bar"})
-	proc.Emit(&core.Event{Type: "other.baz"}) // 不匹配
+	_ = proc.Emit(&core.Event{Type: "test.foo"})
+	_ = proc.Emit(&core.Event{Type: "test.bar"})
+	_ = proc.Emit(&core.Event{Type: "other.baz"}) // 不匹配
 
 	time.Sleep(150 * time.Millisecond)
 
@@ -79,14 +79,14 @@ func TestFlowUnsubscribe(t *testing.T) {
 		return nil
 	})
 
-	proc.Emit(&core.Event{Type: "test.1"})
+	_ = proc.Emit(&core.Event{Type: "test.1"})
 	time.Sleep(100 * time.Millisecond)
 	if count.Load() != 1 {
 		t.Errorf("expected 1 event before unsubscribe, got %d", count.Load())
 	}
 
 	proc.Off(id)
-	proc.Emit(&core.Event{Type: "test.2"})
+	_ = proc.Emit(&core.Event{Type: "test.2"})
 	time.Sleep(100 * time.Millisecond)
 	if count.Load() != 1 {
 		t.Errorf("expected still 1 event after unsubscribe, got %d", count.Load())
@@ -104,7 +104,7 @@ func TestFlowBatchSizeTrigger(t *testing.T) {
 	})
 
 	for i := 0; i < 10; i++ {
-		proc.Emit(&core.Event{Type: "batch.item"})
+		_ = proc.Emit(&core.Event{Type: "batch.item"})
 	}
 
 	time.Sleep(200 * time.Millisecond)
@@ -123,7 +123,7 @@ func TestFlowTimeoutTrigger(t *testing.T) {
 		return nil
 	})
 
-	proc.Emit(&core.Event{Type: "timeout.item"})
+	_ = proc.Emit(&core.Event{Type: "timeout.item"})
 
 	time.Sleep(200 * time.Millisecond)
 	if count.Load() != 1 {
@@ -141,7 +141,7 @@ func TestFlowClose(t *testing.T) {
 	})
 
 	for i := 0; i < 5; i++ {
-		proc.Emit(&core.Event{Type: "close.test"})
+		_ = proc.Emit(&core.Event{Type: "close.test"})
 	}
 	time.Sleep(100 * time.Millisecond)
 	proc.Close()
@@ -155,7 +155,7 @@ func TestFlowDrain(t *testing.T) {
 	defer proc.Close()
 
 	proc.On("drain.test", func(evt *core.Event) error { return nil })
-	proc.Emit(&core.Event{Type: "drain.test"})
+	_ = proc.Emit(&core.Event{Type: "drain.test"})
 
 	err := proc.Drain(500 * time.Millisecond)
 	if err != nil {
@@ -169,7 +169,7 @@ func TestFlowStats(t *testing.T) {
 
 	proc.On("stats.test", func(evt *core.Event) error { return nil })
 	for i := 0; i < 10; i++ {
-		proc.Emit(&core.Event{Type: "stats.test"})
+		_ = proc.Emit(&core.Event{Type: "stats.test"})
 	}
 	time.Sleep(200 * time.Millisecond)
 

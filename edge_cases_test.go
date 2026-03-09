@@ -28,8 +28,8 @@ func TestEdgeCaseEmptyData(t *testing.T) {
 		return nil
 	})
 
-	bus.Emit(&Event{Type: "empty.data", Data: nil})
-	bus.Emit(&Event{Type: "empty.data", Data: []byte{}})
+	_ = bus.Emit(&Event{Type: "empty.data", Data: nil})
+	_ = bus.Emit(&Event{Type: "empty.data", Data: []byte{}})
 
 	if !called {
 		t.Error("handler not called for empty data events")
@@ -151,8 +151,8 @@ func TestEdgeCaseNestedWildcards(t *testing.T) {
 		return nil
 	})
 
-	bus.EmitMatch(&Event{Type: "user.123.action.login"}) // 应匹配
-	bus.EmitMatch(&Event{Type: "user.123.login"})        // 不匹配
+	_ = bus.EmitMatch(&Event{Type: "user.123.action.login"}) // 应匹配
+	_ = bus.EmitMatch(&Event{Type: "user.123.login"})        // 不匹配
 
 	if actual := atomic.LoadInt32(&callCount); actual != 1 {
 		t.Errorf("nested wildcard should match exactly 1, got %d", actual)
@@ -234,7 +234,7 @@ func TestEdgeCaseEventReuse(t *testing.T) {
 
 	evt := &Event{Type: "reuse.test", Data: []byte("data")}
 	for i := 0; i < 10; i++ {
-		bus.Emit(evt)
+		_ = bus.Emit(evt)
 	}
 	if callCount != 10 {
 		t.Errorf("expected 10 calls with reused event, got %d", callCount)

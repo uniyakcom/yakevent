@@ -32,7 +32,7 @@ func TestPackageAPIOnEmitOff(t *testing.T) {
 	Off(id)
 
 	called = 0
-	Emit(&Event{Type: "pkg.test.basic", Data: []byte("again")})
+	_ = Emit(&Event{Type: "pkg.test.basic", Data: []byte("again")})
 	if called != 0 {
 		t.Errorf("expected 0 calls after Off, got %d", called)
 	}
@@ -64,7 +64,7 @@ func TestPackageAPIEmitMatch(t *testing.T) {
 	})
 	defer Off(id)
 
-	EmitMatch(&Event{Type: "pkg.test.wildcard"})
+	_ = EmitMatch(&Event{Type: "pkg.test.wildcard"})
 	if matched != 1 {
 		t.Errorf("expected 1 wildcard match, got %d", matched)
 	}
@@ -94,7 +94,7 @@ func TestPackageAPIEmitBatch(t *testing.T) {
 // TestPackageAPIGetStats 包级 GetStats
 func TestPackageAPIGetStats(t *testing.T) {
 	id := On("pkg.test.stats", func(e *Event) error { return nil })
-	Emit(&Event{Type: "pkg.test.stats"})
+	_ = Emit(&Event{Type: "pkg.test.stats"})
 	Off(id)
 
 	stats := GetStats()
@@ -117,7 +117,7 @@ func TestPackageAPIMultipleHandlers(t *testing.T) {
 	defer Off(id1)
 	defer Off(id2)
 
-	Emit(&Event{Type: "pkg.test.multi"})
+	_ = Emit(&Event{Type: "pkg.test.multi"})
 	if len(order) != 2 {
 		t.Fatalf("expected 2 calls, got %d", len(order))
 	}

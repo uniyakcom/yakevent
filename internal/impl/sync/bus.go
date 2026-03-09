@@ -60,7 +60,7 @@ type Bus struct {
 	// === sync 热路径独立缓存行 ===
 	// syncCnt 已移除 — Emit 热路径不再有计数开销
 	// Stats() 通过 emitted/processed PerCPU 计数器延迟读取
-	_pad1 [64]byte // 独立 cache line，避免与 subs 的 false sharing
+	_ [64]byte // 独立 cache line，避免与 subs 的 false sharing
 
 	// === Reader 异步路径（SPSC 分片调度器，替代 wpool channel）===
 	spsc *sched.ShardedScheduler[*core.Event] // 8B

@@ -151,7 +151,7 @@ func TestScenarioNew(t *testing.T) {
 		called.Store(true)
 		return nil
 	})
-	bus.Emit(&Event{Type: "auto.test"})
+	_ = bus.Emit(&Event{Type: "auto.test"})
 	time.Sleep(50 * time.Millisecond)
 	_ = called.Load() // Async 模式异步处理，仅验证无 panic
 }

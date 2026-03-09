@@ -7,57 +7,58 @@
 [![Lint](https://github.com/uniyakcom/yakevent/actions/workflows/format.yml/badge.svg)](https://github.com/uniyakcom/yakevent/actions/workflows/format.yml)
 [![Test](https://github.com/uniyakcom/yakevent/actions/workflows/test.yml/badge.svg)](https://github.com/uniyakcom/yakevent/actions/workflows/test.yml)
 
+
+**English** | [中文](README.zh.md)
+
 High-performance in-process event bus for Go — 3 implementations · 2 publish modes · 4-layer API, zero-alloc, zero-CAS, zero dependencies.
 
-高性能 Go 进程内事件总线 — 3 种实现 + 2 种发布模式 + 4 层 API，零分配，零 CAS，零外部依赖。
+## Features
 
-## 特性
-
-- **零外部依赖**: 仅依赖标准库
-- **3 种 Bus 实现**: Sync（同步直调）/ Async（Per-P SPSC）/ Flow（Pipeline 流处理）
-- **2 种发布模式**: `Emit`（安全路径，defer/recover 保护）/ `UnsafeEmit`（零保护，极致性能）
-- **4 层 API**: 零配置 `New()` / 场景 `ForXxx()` / 字符串 `Scenario()` / 完全控制 `Option()`
-- **零分配 Emit**: 全部三实现 0 B/op, 0 allocs/op
-- **极致性能**: UnsafeEmit ~3.8 ns（265 M/s），Sync Emit ~14 ns，Async ~23 ns（44 M/s）
-- **零 CAS 热路径**: Per-P SPSC ring，atomic Load/Store only（x86 ≈ 普通 MOV）
-- **模式匹配**: 通配符 `*`（单层）和 `**`（多层）
-- **可插拔中间件**: recoverer / retry / timeout / logging（Logger 接口，支持注入 zerolog/zap）
+- **Zero external dependencies**: standard library only
+- **3 Bus implementations**: Sync (direct call) / Async (Per-P SPSC) / Flow (pipeline processing)
+- **2 publish modes**: `Emit` (safe path, defer/recover protection) / `UnsafeEmit` (zero protection, maximum performance)
+- **4-layer API**: zero-config `New()` / preset `ForXxx()` / string `Scenario()` / full control `Option()`
+- **Zero-alloc Emit**: all three implementations — 0 B/op, 0 allocs/op
+- **Extreme performance**: UnsafeEmit ~3.8 ns (265 M/s), Sync Emit ~14 ns, Async ~23 ns (44 M/s)
+- **Zero-CAS hot path**: Per-P SPSC ring, atomic Load/Store only (x86 ≈ plain MOV)
+- **Pattern matching**: wildcards `*` (single level) and `**` (multi-level)
+- **Pluggable middleware**: recoverer / retry / timeout / logging (Logger interface, supports zerolog/zap injection)
 
 ---
 
-## 性能
+## Performance
 
-### 基准对比
+### Benchmark comparison
 
 ```bash
-go test -bench="BenchmarkImpl" -benchmem -benchtime=1s -count=3 -run="^$"
+./bench.sh
 ```
 
-#### Linux — Intel Xeon E-2186G @ 3.80GHz（6C/12T）<sup>[1]</sup>
+#### Linux — Intel Xeon E-2186G @ 3.80GHz (6C/12T)<sup>[1]</sup>
 
-| 场景 | ns/op | M/s | allocs/op |
-|------|------:|----:|----------:|
-| **UnsafeEmit 单线程** | **3.8 ns** | 265 | 0 |
-| **Sync Emit 单线程** | **14 ns** | 72 | 0 |
-| **Async 单线程** | **23 ns** | 44 | 0 |
-| **Async 高并发** | **16 ns** | 62 | 0 |
-| **Flow 单线程** | **74 ns** | 13 | 0 |
-| **Flow 高并发** | **94 ns** | 10 | 0 |
-| **场景批量插入** | **49 µs/op** | 20 | 0 |
+| Scenario | ns/op | M/s | allocs/op |
+|----------|------:|----:|----------:|
+| **UnsafeEmit single-thread** | **3.8 ns** | 265 | 0 |
+| **Sync Emit single-thread** | **14 ns** | 72 | 0 |
+| **Async single-thread** | **23 ns** | 44 | 0 |
+| **Async high concurrency** | **16 ns** | 62 | 0 |
+| **Flow single-thread** | **74 ns** | 13 | 0 |
+| **Flow high concurrency** | **94 ns** | 10 | 0 |
+| **Scenario batch insert** | **49 µs/op** | 20 | 0 |
 
-<sup>[1]</sup> 数据来源：[bench_linux_6c12t.txt](bench_linux_6c12t.txt)，`go test -benchtime=1s -count=3`，Go 1.25.7，Linux 6.17，本地裸机。CI Runner 数据见 [bench](#bench-分支基准存档) 分支。
+<sup>[1]</sup> Source: [bench_linux_6c12t.txt](bench_linux_6c12t.txt), `go test -benchtime=1s -count=3`, Go 1.25.7, Linux 6.17, bare-metal local. CI Runner data: see [bench](#bench-branch-archive) branch.
 
 ---
 
-## 快速开始
+## Quick Start
 
-### 安装
+### Install
 
 ```bash
 go get github.com/uniyakcom/yakevent
 ```
 
-### 包级 API（最简方式）
+### Package-level API (simplest)
 
 ```go
 import "github.com/uniyakcom/yakevent"
@@ -75,10 +76,10 @@ func main() {
 }
 ```
 
-### 实例化（三预设任选）
+### Instantiation (choose from three presets)
 
 ```go
-bus, _ := yakevent.ForAsync()   // Per-P SPSC 高并发
+bus, _ := yakevent.ForAsync()   // Per-P SPSC high concurrency
 defer bus.Close()
 
 bus.On("order.**", func(e *yakevent.Event) error {
@@ -89,7 +90,7 @@ bus.On("order.**", func(e *yakevent.Event) error {
 bus.Emit(&yakevent.Event{Type: "order.created", Data: []byte(`{"id":123}`)})
 ```
 
-### 中间件
+### Middleware
 
 ```go
 import (
@@ -105,9 +106,9 @@ handler := yakevent.Chain(
         return processOrder(e)
     },
     recoverer.New(),                                    // panic → error
-    logging.New(nil),                                   // 默认 slog
-    timeout.New(5 * time.Second),                       // 超时保护
-    retry.New(retry.Config{MaxRetries: 3}),             // 指数退避重试
+    logging.New(nil),                                   // default slog
+    timeout.New(5 * time.Second),                       // timeout protection
+    retry.New(retry.Config{MaxRetries: 3}),             // exponential backoff retry
 )
 
 bus.On("order.created", handler)
@@ -115,243 +116,314 @@ bus.On("order.created", handler)
 
 ---
 
-## 3 种 Bus 实现 + 2 种发布模式 + 4 层 API
+## 3 Bus Implementations · 2 Publish Modes · 4-layer API
 
-### 3 种 Bus 实现
+### 3 Bus Implementations
 
-| 实现 | 核心技术 | 适用场景 | Emit | UnsafeEmit | 高并发 | error 返回 |
-|------|---------|---------|:---:|:---:|:---:|:---:|
-| **Sync** | 同步直调 + CoW atomic.Pointer | RPC 钩子、权限校验、API 中间件 | **14 ns** | **3.8 ns** | 20 ns | ✅ |
-| **Async** | Per-P SPSC ring + RCU + 三级空转 | 事件总线、日志聚合、实时推送 | 23 ns | = Emit | **16 ns** | ❌ |
-| **Flow** | MPSC ring + Stage Pipeline | ETL 流处理、窗口聚合、批量数据加载 | 74 ns | — | 94 ns | ❌ |
+| Implementation | Core Technology | Use Case | Emit | UnsafeEmit | High Concurrency | error return |
+|----------------|----------------|----------|:----:|:----------:|:----------------:|:------------:|
+| **Sync** | Direct call + CoW atomic.Pointer | RPC hooks, auth checks, API middleware | **14 ns** | **3.8 ns** | 20 ns | ✅ |
+| **Async** | Per-P SPSC ring + RCU + 3-tier spinning | Event bus, log aggregation, real-time push | 23 ns | = Emit | **16 ns** | ❌ |
+| **Flow** | MPSC ring + Stage Pipeline | ETL streaming, window aggregation, batch loading | 74 ns | — | 94 ns | ❌ |
 
-<sup>数据来源: [`bench_linux_6c12t.txt`](bench_linux_6c12t.txt)，Intel Xeon E-2186G @ 3.80GHz 6C/12T</sup>
+<sup>Source: [`bench_linux_6c12t.txt`](bench_linux_6c12t.txt), Intel Xeon E-2186G @ 3.80GHz 6C/12T</sup>
 
-### 2 种发布模式
+### 2 Publish Modes
 
-| 模式 | 说明 |
-|------|------|
-| **`Emit`** | 安全路径，捕获 handler panic，更新 Stats |
-| **`UnsafeEmit`** | 零保护，panic 传播到调用方，不计数，极致性能 |
+| Mode | Description |
+|------|-------------|
+| **`Emit`** | Safe path — captures handler panics, updates Stats |
+| **`UnsafeEmit`** | Zero protection — panic propagates to caller, no counting, maximum performance |
 
-### 4 层 API
+### 4-layer API
 
-| 层级 | API | 说明 |
-|------|-----|------|
-| **L0 零配置** | `yakevent.New()` | 自动检测：≥4 核用 Async，<4 核用 Sync |
-| **L1 场景** | `yakevent.ForSync()` / `ForAsync()` / `ForFlow()` | 选定实现 |
-| **L2 字符串** | `yakevent.Scenario("async")` | 配置文件/环境变量驱动 |
-| **L3 完全控制** | `yakevent.Option(profile)` | 自定义 Profile |
-| **包级** | `yakevent.On()` / `yakevent.Emit()` | 全局 Sync 单例，零初始化 |
+| Layer | API | Description |
+|-------|-----|-------------|
+| **L0 zero-config** | `yakevent.New()` | Auto-detect: ≥4 cores → Async, <4 cores → Sync |
+| **L1 preset** | `yakevent.ForSync()` / `ForAsync()` / `ForFlow()` | Choose implementation |
+| **L2 string** | `yakevent.Scenario("async")` | Config file / env-var driven |
+| **L3 full control** | `yakevent.Option(profile)` | Custom Profile |
+| **Package-level** | `yakevent.On()` / `yakevent.Emit()` | Global Sync singleton, zero init |
 
 ```go
-// 包级 API（Sync 语义）
+// Package-level API (Sync semantics)
 yakevent.On("event", handler)
-yakevent.Emit(event)           // 安全路径，~14 ns
-yakevent.UnsafeEmit(event)     // 零保护，~5.6 ns
+yakevent.Emit(event)           // safe path, ~14 ns
+yakevent.UnsafeEmit(event)     // zero protection, ~5.6 ns
 
-// L1 三核心
-bus, _ := yakevent.ForSync()     // 同步直调
+// L1 three cores
+bus, _ := yakevent.ForSync()     // synchronous direct call
 bus, _ := yakevent.ForAsync()    // Per-P SPSC
 bus, _ := yakevent.ForFlow()     // Pipeline
 
-// L0 自动检测
-bus, _ := yakevent.New()         // ≥4 核 → Async，<4 核 → Sync
+// L0 auto-detect
+bus, _ := yakevent.New()         // ≥4 cores → Async, <4 cores → Sync
 
-// L2 字符串配置
+// L2 string config
 bus, _ := yakevent.Scenario("async")
 
-// L3 完全控制
+// L3 full control
 bus, _ := yakevent.Option(&yakevent.Profile{Name: "async", Conc: 10000, TPS: 50000})
 ```
 
 ---
 
-## 中间件
+## Middleware
 
-### 内置中间件
+### Built-in middleware
 
 ```go
 import (
     "github.com/uniyakcom/yakevent/middleware/recoverer"  // panic → error
-    "github.com/uniyakcom/yakevent/middleware/retry"      // 指数退避重试
-    "github.com/uniyakcom/yakevent/middleware/timeout"    // handler 超时
-    "github.com/uniyakcom/yakevent/middleware/logging"    // 结构化日志
+    "github.com/uniyakcom/yakevent/middleware/retry"      // exponential backoff retry
+    "github.com/uniyakcom/yakevent/middleware/timeout"    // handler timeout
+    "github.com/uniyakcom/yakevent/middleware/logging"    // structured logging
 )
 ```
 
-### 可插拔日志（logging.Logger 接口）
+### Pluggable logging (logging.Logger interface)
 
-`logging.New(logger)` 接受任何实现了 `Logger` 接口的日志库：
+`logging.New(logger)` accepts any logger implementing the `Logger` interface:
 
 ```go
-// Logger 接口（仅 2 个方法）
+// Logger interface (2 methods only)
 type Logger interface {
     Debug(msg string, args ...any)
     Error(msg string, err error, args ...any)
 }
 ```
 
-**默认**（`nil` → `slog.Default()`）：
+**Default** (`nil` → `slog.Default()`):
 
 ```go
 logging.New(nil)
 ```
 
-**接入 zerolog**（zerolog 由调用方引入，yakevent 本体零依赖）：
+**Integrate yaklog** (yaklog is the yak\* ecosystem structured logger, also zero external deps):
 
 ```go
-type zerologAdapter struct{ zl zerolog.Logger }
-func (a *zerologAdapter) Debug(msg string, args ...any)        { a.zl.Debug().Fields(args).Msg(msg) }
-func (a *zerologAdapter) Error(msg string, err error, args ...any) {
-    a.zl.Error().Err(err).Fields(args).Msg(msg)
+import (
+    "github.com/uniyakcom/yaklog"
+    "github.com/uniyakcom/yakevent/middleware/logging"
+)
+
+// yaklogAdapter adapts *yaklog.Logger to the logging.Logger interface.
+type yaklogAdapter struct{ l *yaklog.Logger }
+
+func (a *yaklogAdapter) Debug(msg string, args ...any) {
+    e := a.l.Debug().Msg(msg)
+    for i := 0; i+1 < len(args); i += 2 {
+        k, _ := args[i].(string)
+        e = e.Any(k, args[i+1])
+    }
+    e.Send()
 }
 
-handler := yakevent.Chain(myHandler, logging.New(&zerologAdapter{zl: zerolog.New(os.Stdout)}))
+func (a *yaklogAdapter) Error(msg string, err error, args ...any) {
+    e := a.l.Error().Err(err).Msg(msg)
+    for i := 0; i+1 < len(args); i += 2 {
+        k, _ := args[i].(string)
+        e = e.Any(k, args[i+1])
+    }
+    e.Send()
+}
+
+// Create a yaklog Logger (Console output, Debug level)
+yl := yaklog.New(yaklog.Options{
+    Level: yaklog.Debug,
+    Out:   yaklog.Console(),
+})
+
+handler := yakevent.Chain(myHandler, logging.New(&yaklogAdapter{l: yl}))
 ```
 
 ---
 
-## 架构设计
+## Architecture
 
-### 目录结构
+### Directory structure
 
 ```
 yakevent/
-├── core/                     # 核心接口（Bus / Event / Handler / Middleware）
+├── core/                     # Core interfaces (Bus / Event / Handler / Middleware)
 │   ├── interfaces.go
-│   └── matcher.go           # TrieMatcher 通配符匹配
-├── middleware/               # 内置中间件
-│   ├── recoverer/           # panic → error 恢复
-│   ├── retry/               # 指数退避重试
-│   ├── timeout/             # handler 执行超时
-│   └── logging/             # 可插拔结构化日志（Logger 接口）
+│   └── matcher.go           # TrieMatcher wildcard matching
+├── middleware/               # Built-in middleware
+│   ├── recoverer/           # panic → error recovery
+│   ├── retry/               # exponential backoff retry
+│   ├── timeout/             # handler execution timeout
+│   └── logging/             # pluggable structured logging (Logger interface)
 ├── optimize/                 # Profile → Advisor → Factory
-├── internal/impl/           # 三实现
-│   ├── sync/                # 同步直调 + SyncAsync 子模式
+├── internal/impl/           # Three implementations
+│   ├── sync/                # direct call + SyncAsync sub-mode
 │   ├── async/               # Per-P SPSC Bus
-│   └── flow/                # Pipeline 批处理 Bus
-├── internal/support/        # 基础设施
-│   ├── noop/                # 可切换锁（nil mutex = 零开销）
-│   ├── pool/                # 事件对象池 + Arena 内存管理
-│   ├── sched/               # SPSC 分片调度器（Sync 异步 + Async 共用）
+│   └── flow/                # Pipeline batch-processing Bus
+├── internal/support/        # Infrastructure
+│   ├── noop/                # switchable lock (nil mutex = zero overhead)
+│   ├── pool/                # event object pool + Arena memory management
+│   ├── sched/               # SPSC sharded scheduler (Sync async + Async shared)
 │   ├── spsc/                # Per-P SPSC ring buffer
-│   └── wpool/               # Worker pool（分片 channel + 安全关闭）
-├── util/                    # PerCPUCounter 工具
-└── api.go                   # 统一 API 入口
+│   └── wpool/               # Worker pool (sharded channel + safe close)
+├── util/                    # PerCPUCounter utility
+└── api.go                   # Unified API entry point
 ```
 
-### SPSC 共享架构
+### Shared SPSC architecture
 
-Sync 异步模式与 Async 共用同一 `sched.ShardedScheduler`：
+Sync async mode and Async share the same `sched.ShardedScheduler`:
 
 - **Producer**: `procPin → SPSC Enqueue (~3 ns) → procUnpin → wake`
 - **Consumer**: `SPSC Dequeue → dispatch(snap, handlers) → processed++`
-- **Worker**: 三级自适应空转（PAUSE spin → Gosched → channel park）
+- **Worker**: 3-tier adaptive spinning (PAUSE spin → Gosched → channel park)
 
 ---
 
-## 开发与测试
+## Development & Testing
 
-### 快速验证
+### Quick verify
 
 ```bash
-go build ./...              # 编译
-go vet ./...                # 静态分析
-go test ./... -count=1      # 功能测试
-go test -race ./... -short  # 竞态检测
+go build ./...              # compile
+go vet ./...                # static analysis
+go test ./... -count=1      # functional tests
+go test -race ./... -short  # race detection
 ```
 
-### 测试套件
+### Test suite
 
-| 文件 | 类型 | 说明 |
-|------|------|------|
-| `alloc_test.go` | 正确性 | Arena 零分配、EventPool 正确性、模式匹配零分配（`testing.AllocsPerRun`）|
-| `package_api_test.go` | 功能 | 包级 API（On/Off/Emit/EmitMatch/EmitBatch/Stats） |
-| `scenario_test.go` | 功能 | ForSync/ForAsync/ForFlow 全场景 |
-| `feature_error_test.go` | 功能 | 单/多 handler 错误、批量错误 |
-| `feature_concurrent_test.go` | 功能 | On/Off/Emit 竞态、嵌套订阅、并发 Close |
-| `edge_cases_test.go` | 边界 | 零 handler、大数据、特殊字符、重复取消订阅 |
-| `middleware/middleware_test.go` | 功能 | 中间件组合（recoverer/retry/timeout/logging） |
-| `internal/impl/flow/bus_test.go` | 功能 | Flow Bus 订阅/批次/超时触发 |
-| `impl_bench_test.go` | 基准 | 三实现核心性能守卫（Sync/Async/Flow 单线程 + 高并发 + 批量） |
-| `util/util_bench_test.go` | 基准 | PerCPUCounter Add/Read 性能 |
+| File | Type | Description |
+|------|------|-------------|
+| `alloc_test.go` | Correctness | Arena zero-alloc, EventPool correctness, pattern matching zero-alloc (`testing.AllocsPerRun`) |
+| `package_api_test.go` | Functional | Package-level API (On/Off/Emit/EmitMatch/EmitBatch/Stats) |
+| `scenario_test.go` | Functional | ForSync/ForAsync/ForFlow full scenarios |
+| `feature_error_test.go` | Functional | Single/multi-handler errors, batch errors |
+| `feature_concurrent_test.go` | Functional | On/Off/Emit race, nested subscribe, concurrent Close |
+| `edge_cases_test.go` | Edge cases | Zero handlers, large data, special chars, duplicate unsubscribe |
+| `middleware/middleware_test.go` | Functional | Middleware composition (recoverer/retry/timeout/logging) |
+| `internal/impl/flow/bus_test.go` | Functional | Flow Bus subscribe/batch/timeout trigger |
+| `impl_bench_test.go` | Benchmark | Three-implementation core performance guard (Sync/Async/Flow single-thread + high concurrency + batch) |
+| `util/util_bench_test.go` | Benchmark | PerCPUCounter Add/Read performance |
 
-### 性能基准
+### Scripts
+
+#### `bench.sh` — Benchmark recorder
+
+Runs the full benchmark suite and writes results to `bench_{os}_{cores}c{threads}t.txt` (e.g. `bench_linux_6c12t.txt`). The file header automatically includes timestamp, kernel version, Go version, and CPU model.
 
 ```bash
-# 核心回归（快速，~10s）
-go test -bench="BenchmarkImpl" -benchtime=1s -count=3 -run=^$
-
-# 完整基准
-go test -bench=. -benchmem -benchtime=1s -count=3 -run=^$
-
-# 运行基准测试并保存结果到 bench_{os}_{cores}c{threads}t.txt
+# Default: benchtime=1s, count=3
 ./bench.sh
 
-# 自定义参数: benchtime=3s, count=5
+# Custom duration and repeat count
 ./bench.sh 3s 5
 
-# 性能回归检查（首次无基线时自动创建，阈值默认 15%）
-./bench_guard.sh
-
-# 强制重建基线（硬件变更后）
-./bench_guard.sh force
+# Usage: ./bench.sh [benchtime] [count]
+#   benchtime  duration per benchmark run (default: 1s)
+#   count      repetitions per benchmark for benchstat statistics (default: 3)
 ```
 
-`bench_guard.sh` 守卫 `BenchmarkImplSync` / `BenchmarkImplAsync` / `BenchmarkImplFlow` 三个单线程稳定基准的 ns/op 中位数，超出阈值退出码为 1。每次运行生成两个持久文件（按平台区分）：
+**Output file naming**: `bench_<os>_<cores>c<threads>t.txt`
+- `<os>`: `linux` / `darwin` / `windows`
+- `<cores>`: physical core count
+- `<threads>`: logical thread count
 
-| 文件 | 内容 | 更新时机 |
-|---|---|---|
-| `bench_guard_baseline_{os}.txt` | 各基准中位数（用于对比） | 首次运行 / `force` |
-| `bench_guard_raw_{os}.txt` | 原始测试数据 + 对比分析结果 | 每次运行覆盖 |
+---
 
-CI 基准测试由 `bench.yml` 驱动，4 平台并发：
+#### `bench_guard.sh` — Performance regression guard
 
-| 平台 | Runner | 架构 |
-|---|---|---|
+Compares the ns/op median of `BenchmarkImplSync` / `BenchmarkImplAsync` / `BenchmarkImplFlow` against a stored baseline. Exits with code 1 if any benchmark regresses beyond the threshold.
+
+```bash
+# Regression check (auto-creates baseline on first run)
+./bench_guard.sh
+
+# Force rebuild baseline (after hardware change or baseline expiry)
+./bench_guard.sh force
+
+# Custom threshold (default: 15%)
+BENCH_THRESHOLD=20 ./bench_guard.sh
+
+# Custom benchmark parameters
+BENCH_TIME=3s BENCH_COUNT=7 ./bench_guard.sh
+```
+
+| Environment variable | Default | Description |
+|----------------------|---------|-------------|
+| `BENCH_THRESHOLD` | `15` | ns/op regression percentage threshold |
+| `BENCH_TIME` | `2s` | Duration per benchmark run |
+| `BENCH_COUNT` | `5` | Repetitions (median is used for comparison) |
+
+Persistent files (platform-specific):
+
+| File | Content | Updated when |
+|------|---------|--------------|
+| `bench_guard_baseline_{os}.txt` | Median ns/op per benchmark (used for comparison) | First run / `force` |
+| `bench_guard_raw_{os}.txt` | Raw test data + comparison analysis | Overwritten each run |
+
+> **Note**: This script is for same-environment regression detection only. Cross-Runner / different-hardware comparisons are not meaningful.
+
+---
+
+#### `lint.sh` — Code quality check
+
+```bash
+./lint.sh          # Full check: gofmt -s -w + go vet + golangci-lint
+./lint.sh --vet    # gofmt -s -w + go vet only (skip golangci-lint)
+./lint.sh --fix    # gofmt -s -w + vet + golangci-lint --fix (auto-fix)
+./lint.sh --fmt    # Format only (gofmt -s -w), no vet/lint
+./lint.sh --test   # Quick test: go test ./... -race -count=1
+```
+
+> `gofmt -s -w` runs automatically on all paths except `--test` and `--fmt`. The `-s` flag simplifies redundant composite literals, slice expressions, and similar constructs.
+
+---
+
+#### CI benchmarks (`bench.yml`)
+
+4 platforms run in parallel. On PRs, HEAD is compared against base and `benchstat` diff percentages are reported. Results are archived to the `bench` branch:
+
+| Platform | Runner | Arch |
+|----------|--------|------|
 | `ubuntu-latest` | Ubuntu 24.04 | x86_64 |
 | `windows-latest` | Windows Server 2025 | x86_64 |
 | `ubuntu-24.04-arm` | Ubuntu 24.04 | aarch64 |
-| `macos-latest` | macOS 15（Apple M） | aarch64 |
+| `macos-latest` | macOS 15 (Apple M) | aarch64 |
 
-PR 时同机器对比 HEAD 与 base，`benchstat` 输出差异百分比。结果归档到独立的 `bench` 分支：
-
-### bench 分支基准存档
+### bench branch archive
 
 ```
-bench 分支/
-├── main/                          # push to main 后自动更新
+bench branch/
+├── main/                          # auto-updated on push to main
 │   ├── ubuntu-latest-amd64.txt
 │   ├── windows-latest-amd64.txt
 │   ├── ubuntu-24.04-arm-arm64.txt
 │   └── macos-latest-arm64.txt
-├── pr-{N}/                        # PR #{N} 触发时写入
-│   ├── {os}-{arch}.txt           # HEAD 结果
-│   ├── {os}-{arch}-base.txt      # base commit 结果
-│   └── {os}-{arch}-diff.txt      # benchstat 差异对比
-└── manual/YYYYMMDD/               # 手动触发时写入
+├── pr-{N}/                        # written when PR #{N} triggers
+│   ├── {os}-{arch}.txt           # HEAD results
+│   ├── {os}-{arch}-base.txt      # base commit results
+│   └── {os}-{arch}-diff.txt      # benchstat diff
+└── manual/YYYYMMDD/               # written on manual trigger
     └── {os}-{arch}.txt
 ```
 
-每个文件头部包含环境元数据（os / arch / kernel / go version / commit sha / date），可直接用 `benchstat` 横向对比：
+Each file header includes environment metadata (os / arch / kernel / go version / commit sha / date) and can be compared directly with `benchstat`:
 
 ```bash
-# 查看 CI 最新 main 分支数据
+# View latest main branch CI data
 git fetch origin bench
 git show origin/bench:main/ubuntu-latest-amd64.txt
 
-# 与本地裸机数据对比（跨硬件仅供参考）
+# Compare with local bare-metal data (cross-hardware: reference only)
 benchstat bench_linux_6c12t.txt <(git show origin/bench:main/ubuntu-latest-amd64.txt)
 
-# 查看某个 PR 的回归对比
+# View regression comparison for a PR
 git show origin/bench:pr-42/ubuntu-latest-amd64-diff.txt
 ```
 
-> **注意**：CI Runner（共享虚拟机）与本地裸机存在系统性性能差异，跨环境 ns/op 数值不可直接比较。同一 Runner 上的 PR 对比（`*-diff.txt`）才有统计意义。
+> **Note**: CI Runners (shared VMs) have systematically different performance from bare-metal. Cross-environment ns/op values cannot be compared directly. Only same-Runner PR comparisons (`*-diff.txt`) are statistically meaningful.
 
 ---
 
-## 许可证
+## License
 
-MIT License
+[MIT](LICENSE) © 2026 uniyak.com
