@@ -1,6 +1,6 @@
 # format.yml — 代码格式与静态分析门禁
 #
-# 职责：确保所有提交到 main 的代码符合 gofmt 标准，并通过 go vet 静态分析。
+# 职责：确保所有提交到 main 的代码符合 gofmt 标准，并通过 go vet 和 golangci-lint 静态分析。
 # 触发：push to main/master 和 Pull Request。
 # 失败时：阻止 PR 合并（需在仓库 Branch Rules 中将本工作流设为必须通过的状态检查）。
 name: Lint
@@ -18,6 +18,7 @@ concurrency:
 
 permissions:
   contents: read
+  checks: write   # golangci-lint-action 在 PR 上写入注解所需
 
 jobs:
   lint:
@@ -25,10 +26,10 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       # 检出代码，默认 fetch-depth=1 即可（无需历史记录）
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
       # 安装 go.mod 中声明的 Go 版本，保证与开发环境一致
-      - uses: actions/setup-go@v5
+      - uses: actions/setup-go@v6
         with:
           go-version-file: 'go.mod'
           cache: false
@@ -50,3 +51,9 @@ jobs:
       # go vet 检查常见错误：错误的格式化动词、不可达代码、互斥锁复制等
       - name: Vet
         run: go vet ./...
+
+      # golangci-lint: 使用官方 action，配置来自 .golangci.yml
+      - name: golangci-lint
+        uses: golangci/golangci-lint-action@v9
+        with:
+          version: latest

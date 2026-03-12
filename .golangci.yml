@@ -1,0 +1,60 @@
+version: "2"
+
+run:
+  timeout: 120s
+  modules-download-mode: readonly
+
+linters:
+  default: none
+  enable:
+    - govet          # go vet 静态分析
+    - errcheck       # 未检查的 error 返回值
+    - staticcheck    # 全面静态分析（SA/S/QF/U 规则集，含原 gosimple/unused 功能）
+    - ineffassign    # 赋值后未使用的变量
+    - gosec          # 安全问题扫描（OWASP）
+    - misspell       # 拼写错误
+  settings:
+    govet:
+      enable-all: true
+      disable:
+        # fieldalignment: 字段顺序是性能决策，不强制要求最优对齐
+        - fieldalignment
+        # shadow: if err := ...; err != nil 是 Go 标准惯用写法
+        - shadow
+
+    errcheck:
+      check-blank: false
+      exclude-functions:
+        - fmt.Fprint
+        - fmt.Fprintf
+        - fmt.Fprintln
+
+    staticcheck:
+      checks:
+        - "all"
+        - "-SA1019"  # 已弃用 API，升级时再处理
+        - "-ST1000"  # 文件头注释格式不强制
+        - "-ST1003"  # 测试辅助函数允许下划线命名
+
+    gosec:
+      excludes:
+        # G103: util/util.go 中的 unsafe 用法已人工审计（zero-copy string/byte 转换）
+        - G103
+        # G104: 由 errcheck linter 覆盖，gosec 重复报告
+        - G104
+        # G115: integer overflow conversion — 事件队列索引已验证为有界值
+        - G115
+
+  exclusions:
+    rules:
+      # 测试文件：弱随机数用于测试数据，不是密码学场景
+      - path: "_test\\.go$"
+        linters: [gosec]
+        text: "G404"
+      # 基准测试：err 有时故意忽略
+      - path: "_bench_test\\.go$|bench_test\\.go$"
+        linters: [errcheck]
+
+issues:
+  max-issues-per-linter: 0
+  max-same-issues: 0

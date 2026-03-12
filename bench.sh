@@ -1,10 +1,10 @@
-#!/bin/bash
+#!/usr/bin/env bash
 # yakevent 基准测试脚本
 # 用法: ./bench.sh [benchtime] [count]
-#   benchtime: 每次测试持续时间（默认 3s）
+#   benchtime: 每次测试持续时间（默认 1s）
 #   count:     重复次数（默认 3）
 
-set -e
+set -euo pipefail
 
 BENCHTIME="${1:-1s}"
 COUNT="${2:-3}"
@@ -54,3 +54,9 @@ go test . ./util/ -bench='^Benchmark' -benchmem -benchtime="$BENCHTIME" -count="
 
 echo ""
 echo "=== Results saved to $OUTFILE ==="
+
+# ── 尾部 ─────────────────────────────────────────────────────────────────────────
+{
+    echo ""
+    echo "PASS"
+} >> "$OUTFILE"

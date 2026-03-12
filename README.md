@@ -199,7 +199,7 @@ type Logger interface {
 logging.New(nil)
 ```
 
-**Integrate yaklog** (yaklog is the yak\* ecosystem structured logger, also zero external deps):
+**Integrate [yaklog](https://github.com/uniyakcom/yaklog)** (yaklog is the yak\* ecosystem structured logger, also zero external deps):
 
 ```go
 import (
@@ -241,33 +241,6 @@ handler := yakevent.Chain(myHandler, logging.New(&yaklogAdapter{l: yl}))
 
 ## Architecture
 
-### Directory structure
-
-```
-yakevent/
-├── core/                     # Core interfaces (Bus / Event / Handler / Middleware)
-│   ├── interfaces.go
-│   └── matcher.go           # TrieMatcher wildcard matching
-├── middleware/               # Built-in middleware
-│   ├── recoverer/           # panic → error recovery
-│   ├── retry/               # exponential backoff retry
-│   ├── timeout/             # handler execution timeout
-│   └── logging/             # pluggable structured logging (Logger interface)
-├── optimize/                 # Profile → Advisor → Factory
-├── internal/impl/           # Three implementations
-│   ├── sync/                # direct call + SyncAsync sub-mode
-│   ├── async/               # Per-P SPSC Bus
-│   └── flow/                # Pipeline batch-processing Bus
-├── internal/support/        # Infrastructure
-│   ├── noop/                # switchable lock (nil mutex = zero overhead)
-│   ├── pool/                # event object pool + Arena memory management
-│   ├── sched/               # SPSC sharded scheduler (Sync async + Async shared)
-│   ├── spsc/                # Per-P SPSC ring buffer
-│   └── wpool/               # Worker pool (sharded channel + safe close)
-├── util/                    # PerCPUCounter utility
-└── api.go                   # Unified API entry point
-```
-
 ### Shared SPSC architecture
 
 Sync async mode and Async share the same `sched.ShardedScheduler`:
@@ -288,21 +261,6 @@ go vet ./...                # static analysis
 go test ./... -count=1      # functional tests
 go test -race ./... -short  # race detection
 ```
-
-### Test suite
-
-| File | Type | Description |
-|------|------|-------------|
-| `alloc_test.go` | Correctness | Arena zero-alloc, EventPool correctness, pattern matching zero-alloc (`testing.AllocsPerRun`) |
-| `package_api_test.go` | Functional | Package-level API (On/Off/Emit/EmitMatch/EmitBatch/Stats) |
-| `scenario_test.go` | Functional | ForSync/ForAsync/ForFlow full scenarios |
-| `feature_error_test.go` | Functional | Single/multi-handler errors, batch errors |
-| `feature_concurrent_test.go` | Functional | On/Off/Emit race, nested subscribe, concurrent Close |
-| `edge_cases_test.go` | Edge cases | Zero handlers, large data, special chars, duplicate unsubscribe |
-| `middleware/middleware_test.go` | Functional | Middleware composition (recoverer/retry/timeout/logging) |
-| `internal/impl/flow/bus_test.go` | Functional | Flow Bus subscribe/batch/timeout trigger |
-| `impl_bench_test.go` | Benchmark | Three-implementation core performance guard (Sync/Async/Flow single-thread + high concurrency + batch) |
-| `util/util_bench_test.go` | Benchmark | PerCPUCounter Add/Read performance |
 
 ### Scripts
 

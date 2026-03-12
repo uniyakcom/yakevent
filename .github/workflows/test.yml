@@ -36,11 +36,11 @@ jobs:
     runs-on: ${{ matrix.os }}
     steps:
       # 检出代码
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
       # 安装 go.mod 中声明的 Go 版本（保证与开发环境一致）
       # cache: false — 无外部依赖（go.sum 可能不存在），禁用缓存避免警告
-      - uses: actions/setup-go@v5
+      - uses: actions/setup-go@v6
         with:
           go-version-file: 'go.mod'
           cache: false

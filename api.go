@@ -2,8 +2,8 @@
 //
 // 三种工作模式:
 //   - Sync  (~15ns/op): 同步直调，RPC/中间件链路，error 立即返回
-//   - Async (~33ns/op): Per-P SPSC 异步高吞吐，发布订阅/日志聚合
-//   - Flow  (~70ns/op): 多阶段 Pipeline 批处理，ETL/窗口聚合
+//   - Async (~23ns/op): Per-P SPSC 异步高吞吐，发布订阅/日志聚合
+//   - Flow  (~74ns/op): 多阶段 Pipeline 批处理，ETL/窗口聚合
 //
 // 快速开始:
 //
@@ -59,10 +59,10 @@ func New() (Bus, error) { return Option(optimize.AutoDetect()) }
 // ForSync 创建同步 Bus（~15ns/op，低延迟，适合 RPC/中间件链路）
 func ForSync() (Bus, error) { return Option(optimize.Sync()) }
 
-// ForAsync 创建 Per-P SPSC 异步 Bus（~33ns/op，高吞吐，适合发布订阅）
+// ForAsync 创建 Per-P SPSC 异步 Bus（~23ns/op，高吞吐，适合发布订阅）
 func ForAsync() (Bus, error) { return Option(optimize.Async()) }
 
-// ForFlow 创建批处理 Pipeline Bus（~70ns/op，批次处理，适合 ETL）
+// ForFlow 创建批处理 Pipeline Bus（~74ns/op，批次处理，适合 ETL）
 func ForFlow() (Bus, error) { return Option(optimize.Flow()) }
 
 // Scenario 按预设名称创建 Bus（"sync"/"async"/"flow"）

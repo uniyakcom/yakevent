@@ -43,6 +43,9 @@ type ShardedScheduler[T any] struct {
 	OnPanic  func(any)
 	parked   atomic.Int32
 	sem      chan struct{}
+	// backpressureCh: 消费者消费一批后非阻塞通知，让 submitSlow 真正 block
+	// 容量 1 足够：producers 等待的是「任意 ring 有空位」信号，无需精确计数
+	backpressureCh chan struct{}
 }
 
 // NewShardedScheduler 创建 SPSC 分片调度器
@@ -72,12 +75,13 @@ func NewShardedScheduler[T any](ringSize uint64, workers int) *ShardedScheduler[
 	numRings = n
 
 	ss := &ShardedScheduler[T]{
-		rings:    make([]*sl.SPSCRing[T], numRings),
-		numRings: numRings,
-		ringMask: numRings - 1,
-		workers:  workers,
-		done:     make(chan struct{}),
-		sem:      make(chan struct{}, workers),
+		rings:          make([]*sl.SPSCRing[T], numRings),
+		numRings:       numRings,
+		ringMask:       numRings - 1,
+		workers:        workers,
+		done:           make(chan struct{}),
+		sem:            make(chan struct{}, workers),
+		backpressureCh: make(chan struct{}, 1),
 	}
 	for i := 0; i < numRings; i++ {
 		ss.rings[i] = sl.NewSPSCRing[T](ringSize)
@@ -109,10 +113,25 @@ func (ss *ShardedScheduler[T]) Submit(v T) {
 	}
 }
 
-// submitSlow ring 满时的背压重试
+// submitSlow ring 满时的背压处理
+// 优先轮询全部 ring（负载均衡），仍满则真正 park 等待消费者信号，
+// 避免原先 runtime.Gosched() 无限自旋导致的 CPU 浪费。
 func (ss *ShardedScheduler[T]) submitSlow(v T) {
+	// 先轮询所有 ring 一次，尽可能利用其他分片的空位
+	for i := 0; i < ss.numRings; i++ {
+		if ss.rings[i].Enqueue(v) {
+			return
+		}
+	}
+	// 全部 ring 均满：阻塞等待消费者释放空间（by backpressureCh）
+	// 比 Gosched 自旋省 CPU；比 time.Sleep 响应更快（消费者消费即唤醒）
 	for {
-		runtime.Gosched() // 让出 CPU 让 consumer 消费
+		select {
+		case <-ss.backpressureCh:
+		case <-ss.done:
+			// Bus 已关闭，放弃入队（closed bus 不再接收新事件）
+			return
+		}
 		pid := runtime_procPin()
 		ring := ss.rings[pid&ss.ringMask]
 		ok := ring.Enqueue(v)
@@ -172,6 +191,11 @@ func (ss *ShardedScheduler[T]) workerLoop(owned []int, loop func(T)) {
 
 		if consumed {
 			idle = 0
+			// 非阻塞通知被 submitSlow 阻塞的生产者（容量=1，无需精确计数）
+			select {
+			case ss.backpressureCh <- struct{}{}:
+			default:
+			}
 			continue
 		}
 

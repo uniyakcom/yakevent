@@ -199,7 +199,7 @@ type Logger interface {
 logging.New(nil)
 ```
 
-**接入 yaklog**（yaklog 是 yak\* 生态的结构化日志库，同样零外部依赖）：
+**接入 [yaklog](https://github.com/uniyakcom/yaklog)**（yaklog 是 yak\* 生态的结构化日志库，同样零外部依赖）：
 
 ```go
 import (
@@ -241,33 +241,6 @@ handler := yakevent.Chain(myHandler, logging.New(&yaklogAdapter{l: yl}))
 
 ## 架构设计
 
-### 目录结构
-
-```
-yakevent/
-├── core/                     # 核心接口（Bus / Event / Handler / Middleware）
-│   ├── interfaces.go
-│   └── matcher.go           # TrieMatcher 通配符匹配
-├── middleware/               # 内置中间件
-│   ├── recoverer/           # panic → error 恢复
-│   ├── retry/               # 指数退避重试
-│   ├── timeout/             # handler 执行超时
-│   └── logging/             # 可插拔结构化日志（Logger 接口）
-├── optimize/                 # Profile → Advisor → Factory
-├── internal/impl/           # 三实现
-│   ├── sync/                # 同步直调 + SyncAsync 子模式
-│   ├── async/               # Per-P SPSC Bus
-│   └── flow/                # Pipeline 批处理 Bus
-├── internal/support/        # 基础设施
-│   ├── noop/                # 可切换锁（nil mutex = 零开销）
-│   ├── pool/                # 事件对象池 + Arena 内存管理
-│   ├── sched/               # SPSC 分片调度器（Sync 异步 + Async 共用）
-│   ├── spsc/                # Per-P SPSC ring buffer
-│   └── wpool/               # Worker pool（分片 channel + 安全关闭）
-├── util/                    # PerCPUCounter 工具
-└── api.go                   # 统一 API 入口
-```
-
 ### SPSC 共享架构
 
 Sync 异步模式与 Async 共用同一 `sched.ShardedScheduler`：
@@ -288,21 +261,6 @@ go vet ./...                # 静态分析
 go test ./... -count=1      # 功能测试
 go test -race ./... -short  # 竞态检测
 ```
-
-### 测试套件
-
-| 文件 | 类型 | 说明 |
-|------|------|------|
-| `alloc_test.go` | 正确性 | Arena 零分配、EventPool 正确性、模式匹配零分配（`testing.AllocsPerRun`）|
-| `package_api_test.go` | 功能 | 包级 API（On/Off/Emit/EmitMatch/EmitBatch/Stats） |
-| `scenario_test.go` | 功能 | ForSync/ForAsync/ForFlow 全场景 |
-| `feature_error_test.go` | 功能 | 单/多 handler 错误、批量错误 |
-| `feature_concurrent_test.go` | 功能 | On/Off/Emit 竞态、嵌套订阅、并发 Close |
-| `edge_cases_test.go` | 边界 | 零 handler、大数据、特殊字符、重复取消订阅 |
-| `middleware/middleware_test.go` | 功能 | 中间件组合（recoverer/retry/timeout/logging） |
-| `internal/impl/flow/bus_test.go` | 功能 | Flow Bus 订阅/批次/超时触发 |
-| `impl_bench_test.go` | 基准 | 三实现核心性能守卫（Sync/Async/Flow 单线程 + 高并发 + 批量） |
-| `util/util_bench_test.go` | 基准 | PerCPUCounter Add/Read 性能 |
 
 ### 性能基准
 
